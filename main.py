@@ -1,5 +1,6 @@
 import gym
-from gym import Env
+import wandb
+
 from gym.wrappers import TransformReward
 from tqdm import trange
 from agents.gq import QAgent
@@ -15,6 +16,7 @@ SAVE_PATH = f"agents/pretrained/{AGENT_NAME}.{AGENT_CLASS.__name__}"
 
 
 def train(episodes=500) -> None:
+    wandb.init(project="gq-agents")
     env = gym.make(ENV_NAME)
     env = TransformReward(env, lambda r: 0.01*r)
     with env:
@@ -28,8 +30,17 @@ def train(episodes=500) -> None:
         )
 
         with trange(episodes) as pbar:
+            wandb.watch(agent.model, log="all")
+
             for _ in pbar:
                 steps, reward, loss = episode(env, agent, render_step=20, train=True)
+
+                wandb.log({
+                    "steps": steps,
+                    "reward": reward,
+                    "loss": loss,
+                })
+
                 pbar.set_description(
                     f"{steps=:3d}, "
                     f"{reward=:.3f}, "

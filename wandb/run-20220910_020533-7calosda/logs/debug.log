@@ -1,0 +1,16 @@
+2022-09-10 02:05:33,300 INFO    MainThread:33264 [wandb_setup.py:_flush():75] Loading settings from C:\Users\20mah\.config\wandb\settings
+2022-09-10 02:05:33,300 INFO    MainThread:33264 [wandb_setup.py:_flush():75] Loading settings from C:\Users\20mah\Projects\data-science\RL\bipedal-walker\wandb\settings
+2022-09-10 02:05:33,301 INFO    MainThread:33264 [wandb_setup.py:_flush():75] Loading settings from environment variables: {}
+2022-09-10 02:05:33,301 INFO    MainThread:33264 [wandb_setup.py:_flush():75] Inferring run settings from compute environment: {'program_relpath': 'main.py', 'program': 'main.py'}
+2022-09-10 02:05:33,301 INFO    MainThread:33264 [wandb_init.py:_log_setup():438] Logging user logs to C:\Users\20mah\Projects\data-science\RL\bipedal-walker\wandb\run-20220910_020533-7calosda\logs\debug.log
+2022-09-10 02:05:33,301 INFO    MainThread:33264 [wandb_init.py:_log_setup():439] Logging internal logs to C:\Users\20mah\Projects\data-science\RL\bipedal-walker\wandb\run-20220910_020533-7calosda\logs\debug-internal.log
+2022-09-10 02:05:33,302 INFO    MainThread:33264 [wandb_init.py:init():472] calling init triggers
+2022-09-10 02:05:33,302 INFO    MainThread:33264 [wandb_init.py:init():475] wandb.init called with sweep_config: {}
+config: {}
+2022-09-10 02:05:33,303 INFO    MainThread:33264 [wandb_init.py:init():525] starting backend
+2022-09-10 02:05:33,303 INFO    MainThread:33264 [backend.py:_multiprocessing_setup():99] multiprocessing start_methods=spawn, using: spawn
+2022-09-10 02:05:33,314 INFO    MainThread:33264 [backend.py:ensure_launched():219] starting backend process...
+2022-09-10 02:05:34,431 INFO    MainThread:33264 [backend.py:ensure_launched():224] started backend process with pid: 29872
+2022-09-10 02:05:34,434 INFO    MainThread:33264 [wandb_init.py:init():534] backend started and connected
+2022-09-10 02:05:34,439 INFO    MainThread:33264 [wandb_init.py:init():598] updated telemetry
+2022-09-10 02:05:34,521 INFO    MainThread:33264 [wandb_init.py:init():629] communicating run to backend with 30 second timeout
