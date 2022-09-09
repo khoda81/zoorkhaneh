@@ -1,41 +1,67 @@
-from itertools import count
 import gym
-import random
-import numpy as np
+from gym import Env
+
+from itertools import count
 from tqdm import trange, tqdm
 
-
-# env = gym.make("BipedalWalker-v3")
-env = gym.make("CartPole-v1")
+from agents.agent import AgentBase
 
 
-def Random_games():
-    # Each of this episode is its own game.
-    for episode in trange(500):
-        obs = env.reset()
-        # this is each frame, up to 500...but we wont make it that far with random.
-        done = False
-        for step in tqdm(count(0), leave=False):
-            # This will display the environment
-            # Only display if you really want to see it.
-            # Takes much longer to display it.
+def episode(
+    env,
+    agent,
+    render_step=10,
+    train=True,
 
-            if (step + 1) % 1 == 0:
-                env.render()
+):
+    obs = env.reset()
+    agent.reset()
 
-            # This will just create a sample action in any environment.
-            # In this environment, the action can be any of one how in list on 4, for example [0 1 0 0]
-            action = env.action_space.sample()
+    if train:
+        # remember with no action, reward, done
+        agent.remember(obs)
 
-            # this executes the environment with an action,
-            # and returns the observation of the environment,
-            # the reward, if the env is over, and other info.
-            obs, reward, done, info = env.step(action)
+    total_reward = 0
 
-            # lets print everything in one line:
-            #print(reward, action)
-            if done:
-                break
+    # count() is a generator that counts up
+    # leave=False means that the progress bar will be cleared after each episode
+    # useful for running multiple episodes in a loop with tqdm progress bar
+    for step in tqdm(count(), leave=False):
+        # render on multiples of render_step
+        if (step + 1) % render_step == 0:
+            env.render()
+
+        action = agent(obs)
+        obs, reward, done, info = env.step(action)
+
+        if train:
+            # remember this transition for training
+            agent.remember(obs, action, reward, done)
+            agent.learn()
+
+        total_reward += reward
+
+        if done:
+            break
+
+    return step + 1, total_reward
 
 
-Random_games()
+def random_games() -> None:
+    with gym.make(ENV_NAME) as env:
+        env: Env
+
+        agent = AgentBase(
+            env.action_space,
+            env.observation_space,
+            "Mira",
+        )
+
+        for _ in trange(10):
+            episode(env, agent)
+
+
+if __name__ == "__main__":
+    ENV_NAME = "CartPole-v1"
+    # ENV_NAME = "BipedalWalker-v3"
+    random_games()

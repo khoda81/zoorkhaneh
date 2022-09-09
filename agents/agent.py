@@ -1,20 +1,21 @@
-import numpy as np
-
-from abc import ABC, abstractmethod
+from gym import Space
 
 
-class AgentBase(ABC):
-    def __init__(self, name: str) -> None:
+class AgentBase:
+    def __init__(self, action_space: Space, observation_space: Space, name: str) -> None:
         """
         Initialize the class.
 
         Args:
+            action_space: The action space of the environment.
+            observation_space: The observation space of the environment.
             name: The name of the agent.
         """
+        self.action_space = action_space
+        self.observation_space = observation_space
         self.name = name
 
-    @abstractmethod
-    def act(self, obs: np.ndarray, remember: bool = False) -> int:
+    def act(self, obs):
         """
         Act based on the observation.
 
@@ -23,9 +24,9 @@ class AgentBase(ABC):
             remember (bool): Whether to remember the action.
 
         Returns:
-            int: Action to take.
+            action Action to take.
         """
-        pass
+        return self.action_space.sample()
 
     def reward(self, reward: float) -> None:
         """
@@ -34,45 +35,31 @@ class AgentBase(ABC):
         Args:
             reward: The reward value.
         """
-        pass
 
     def reset(self) -> None:
         """
         Reset the state of the agent.
         """
-        pass
 
-    def remember(self, state, action, reward, done) -> None:
+    def remember(self, new_obs, action=None, reward=0, done=False) -> None:
         """
         Remember the action taken.
 
         Args:
-            state: The state before the action.
+            new_obs: The observation after the action.
             action: The action taken.
             reward: The reward received.
-            next_state: The state after the action.
             done: Whether the episode is done.
         """
-        pass
 
-    def __call__(self, obs, remember=True):
+    def learn(self) -> None:
         """
-        Call agent.act()
-
-        Args:
-            obs (np.ndarray): Observation from the environment.
-            remember (bool): Whether to remember the action.
-
-        Returns:
-            int: Action to take.
+        Perform one training step.
         """
-        return self.act(obs)
+
+    def __call__(self, *args, **kwargs):
+        """Call agent.act()"""
+        return self.act(*args, **kwargs)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.name})"
-
-
-class RandomAgent(AgentBase):
-    def act(self, state: tuple[np.ndarray, bool]) -> int:
-        board, my_turn = state
-        return np.random.choice(np.where(board == 0)[0])
