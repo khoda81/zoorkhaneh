@@ -52,10 +52,14 @@ class AgentBase:
             done: Whether the episode is done.
         """
 
-    def learn(self) -> None:
+    def learn(self) -> float:
         """
         Perform one training step.
+        
+        Returns:
+            The loss value.
         """
+        return 0.
 
     def __call__(self, *args, **kwargs):
         """Call agent.act()"""
