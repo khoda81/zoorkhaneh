@@ -23,33 +23,37 @@ def episode(env, agent, render_step=10, train=True) -> tuple[int, float, float]:
         agent.remember(obs)
 
     total_reward = 0
+    current_loss = 0
     total_loss = 0
-
-    # count() is a generator that counts up
-    # leave=False means that the progress bar will be cleared after each episode
-    # useful for running multiple episodes in a loop with tqdm progress bar
     try:
         max_step = env.spec.max_episode_steps
     except AttributeError:
         max_step = None
 
-    for step in tqdm(count(), leave=False, total=max_step):
-        # render on multiples of render_step
-        if (step + 1) % render_step == 0:
-            env.render()
+    # count() is a generator that counts up
+    # leave=False means that the progress bar will be cleared after each episode
+    # useful for running multiple episodes in a loop with tqdm progress bar
+    with tqdm(count(1), leave=False, total=max_step) as pbar:
+        for step in pbar:
+            # render on multiples of render_step
+            if step % render_step == 0 and 'human' in env.metadata['render_modes']:
+                env.render(mode='human')
 
-        action = agent(obs)
-        obs, reward, done, info = env.step(action)
+            description = ""
+            action = agent(obs)
+            obs, reward, done, info = env.step(action)
+            total_reward += reward
 
-        if train:
-            # remember this transition for training
-            agent.remember(obs, action, reward, done)
-            total_loss += agent.learn()
+            if train:
+                agent.remember(obs, action, reward, done)
+                current_loss = agent.learn()
 
-        total_reward += reward
+                total_loss += current_loss
 
-        if done:
-            break
+            description += f"{current_loss=:6.3f}, {reward=:6.3f}, {total_reward=:6.3f}"
+            pbar.set_description(description)
 
-    steps = step + 1
-    return steps, total_reward, total_loss / steps
+            if done:
+                break
+
+    return step, total_reward, total_loss / step
