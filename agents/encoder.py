@@ -49,6 +49,10 @@ class Encoder(ABC, nn.Module):
         pass
 
     @abstractmethod
+    def setitem(self, sample_batch, item, value):
+        pass
+
+    @abstractmethod
     def shape(self, sample_batch):
         """
         Return the batch shpae of the given sample batch.
@@ -74,17 +78,18 @@ class TensorEncoder(Encoder):
         return torch.tensor(sample, dtype=self.dtype, device=self.device)
 
     def sample(self, batch_size=1, minibatch_size=64):
-        sample = torch.empty(batch_size, *self.space.shape, dtype=self.dtype, device=self.device)
+        samples = []
         for i in range(0, batch_size, minibatch_size):
-            mini_size = len(sample[i:i+minibatch_size])
+            minisize = min(batch_size - i, minibatch_size)
             minibatch = np.array([
                 self.space.sample()
-                for _ in range(mini_size)
+                for _ in range(minisize)
             ])
 
-            sample[i:i+minibatch_size] = self.prepare(minibatch)
+            mini_batch = self.prepare(minibatch)
+            samples.append(mini_batch)
 
-        return sample
+        return torch.cat(samples)
 
     def concat(self, sample_batch, new_sample):
         return torch.cat([sample_batch, new_sample])
@@ -102,6 +107,65 @@ class TensorEncoder(Encoder):
         return np.array(x.to(torch.device('cpu')))
 
 
+class ByteImageEncoder(TensorEncoder):
+    def __init__(self, space: Box, embed_dim=256):
+        super(TensorEncoder, self).__init__(space)
+        self.dtype = torch.uint8
+
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.Flatten(start_dim=-3),
+            nn.ReLU(),
+        )
+
+        with torch.no_grad():
+            sample = self.sample(1)
+            sample = sample.to(torch.float32) / 255.0 - .5
+            _, n = self(sample).shape
+
+        self.encoder.append(nn.Linear(n, embed_dim))
+
+    @staticmethod
+    def supports(space: Space) -> bool:
+        if not (
+            type(space) == Box and
+            space.dtype == np.uint8 and
+            len(space.shape) == 3 and
+            space.low.min() == 0 and
+            space.high.max() == 255
+        ):
+            return False
+
+        h, w, c = space.shape
+        return c == 3 and h >= 30 and w >= 30
+
+    def forward(self, x):
+        x = x.to(torch.float32) / 255.0 - .5
+        return self.encoder(x)
+
+    def prepare(self, sample):
+        # rearange last three dimensions to be (c, h, w)
+        return (
+            super()
+            .prepare(sample)
+            .transpose(-1, -3)
+        )
+
+    def item(self, x):
+        return np.array(
+            x
+            .transpose(-1, -3)
+            .to(torch.device('cpu')),
+            dtype=np.uint8
+        )
+
+
 class BoxEncoder(TensorEncoder):
     def __init__(self, space: Box, embed_dim=256):
         super().__init__(
@@ -114,7 +178,14 @@ class BoxEncoder(TensorEncoder):
 
     @classmethod
     def supports(cls, space: Space) -> bool:
-        return type(space) == Box
+        return (
+            type(space) == Box and
+            space.dtype in [
+                np.float16,
+                np.float32,
+                np.float64,
+            ]
+        )
 
 
 class DiscreteEncoder(TensorEncoder):
@@ -290,6 +361,7 @@ class DictEncoder(Encoder):
 
 
 encoders = [
+    ByteImageEncoder,
     BoxEncoder,
     DiscreteEncoder,
     MultiDiscreteEncoder,
