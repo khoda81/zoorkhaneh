@@ -1,3 +1,4 @@
+from typing import Any
 from gym import Space
 
 
@@ -15,7 +16,7 @@ class AgentBase:
         self.observation_space = observation_space
         self.name = name
 
-    def act(self, obs):
+    def act(self, obs) -> tuple[Any, float]:
         """
         Act based on the observation.
 
@@ -24,9 +25,9 @@ class AgentBase:
             remember (bool): Whether to remember the action.
 
         Returns:
-            action Action to take.
+            The action to take and the value of the action.
         """
-        return self.action_space.sample()
+        return self.action_space.sample(), 0.
 
     def reward(self, reward: float) -> None:
         """
@@ -41,12 +42,12 @@ class AgentBase:
         Reset the state of the agent.
         """
 
-    def remember(self, new_obs, action=None, reward=0, done=False) -> None:
+    def remember(self, new_observation, action=None, reward=0, termination=False, truncation=False) -> None:
         """
         Remember the action taken.
 
         Args:
-            new_obs: The observation after the action.
+            new_observation: The observation after the action.
             action: The action taken.
             reward: The reward received.
             done: Whether the episode is done.
@@ -55,11 +56,14 @@ class AgentBase:
     def learn(self) -> float:
         """
         Perform one training step.
-        
+
         Returns:
             The loss value.
         """
         return 0.
+
+    def close(self) -> None:
+        """Close the agent."""
 
     def __call__(self, *args, **kwargs):
         """Call agent.act()"""

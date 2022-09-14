@@ -1,9 +1,12 @@
 from itertools import count
 from tqdm import tqdm
 
+from agents.agent import AgentBase
 
-def episode(env, agent, render_step=10, train=True) -> tuple[int, float, float]:
-    """Run a single episode of the environment.
+
+def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
+    """
+    Run a single episode of the environment.
 
     Args:
         env: The environment to run the episode in.
@@ -15,15 +18,15 @@ def episode(env, agent, render_step=10, train=True) -> tuple[int, float, float]:
         A tuple containing the number of steps taken, the total reward, and the
         average loss.
     """
-    obs = env.reset()
+    observations, info = env.reset()
     agent.reset()
 
     if train:
         # remember with no action, reward, done
-        agent.remember(obs)
+        agent.remember(observations)
 
-    total_reward = 0
-    current_loss = 0
+    rew_acc = 0
+    loss = 0
     total_loss = 0
     try:
         max_step = env.spec.max_episode_steps
@@ -35,25 +38,21 @@ def episode(env, agent, render_step=10, train=True) -> tuple[int, float, float]:
     # useful for running multiple episodes in a loop with tqdm progress bar
     with tqdm(count(1), leave=False, total=max_step) as pbar:
         for step in pbar:
-            # render on multiples of render_step
-            if step % render_step == 0 and 'human' in env.metadata['render_modes']:
-                env.render(mode='human')
-
             description = ""
-            action = agent(obs)
-            obs, reward, done, info = env.step(action)
-            total_reward += reward
+            action, value = agent(observations)
+            observations, reward, termination, truncation, info = env.step(action)
+            rew_acc += reward
 
             if train:
-                agent.remember(obs, action, reward, done)
-                current_loss = agent.learn()
+                agent.remember(observations, action, reward, termination, truncation)
+                loss = agent.learn()
 
-                total_loss += current_loss
+                total_loss += loss
 
-            description += f"{current_loss=:6.3f}, {reward=:6.3f}, {total_reward=:6.3f}"
+            description += f"{loss=:6.3f}, {reward=:6.2f}, {rew_acc=:6.2f}, {value=:6.2f}"
             pbar.set_description(description)
 
-            if done:
+            if termination or truncation:
                 break
 
-    return step, total_reward, total_loss / step
+    return step, rew_acc, total_loss / step

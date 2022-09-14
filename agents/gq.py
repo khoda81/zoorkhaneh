@@ -1,11 +1,10 @@
 import pickle
-import numpy as np
 import torch
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from agents.agent import AgentBase
 from agents.encoder import auto_encoder
-from agents.replay_buffer import ReplayDeque
+from agents.replay_buffer import ReplayMemory
 from gym.spaces import Space
 from torch.nn import functional as F
 from torch import nn, optim
@@ -18,18 +17,12 @@ class QModel(nn.Module):
         observation_space: Space,
         action_encoder=auto_encoder,
         observation_encoder=auto_encoder,
-        embed_dim: int = 512,
+        embed_dim: int = 1024,
     ):
         super().__init__()
         self.action_encoder = action_encoder(action_space, embed_dim)
         self.observation_encoder = observation_encoder(observation_space, embed_dim)
         self.decoder = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
             nn.Linear(embed_dim, embed_dim),
             nn.ReLU(),
             nn.Linear(embed_dim, 1)
@@ -72,9 +65,8 @@ class QAgent(AgentBase):
         device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),
-        lr: float = 1e-5,
-        replay_memory_size: int = 128,
-        gamma: float = 0.99,
+        lr: float = 1e-3,
+        replay_memory_size: int = 4096,
         n_samples: int = 32,
     ) -> None:
         super().__init__(action_space, observation_space, name)
@@ -93,52 +85,36 @@ class QAgent(AgentBase):
             lr=lr,
         )
 
-        self.gameplays = ReplayDeque(
+        self.gameplays = ReplayMemory(
             action_encoder=self.model.action_encoder,
             observation_encoder=self.model.observation_encoder,
-            max_size=replay_memory_size,
+            capacity=replay_memory_size,
         )
 
-        self.gamma = gamma
         self.n_samples = n_samples
 
-    def act(self, obs: np.ndarray) -> int:
-        """Choose an action for the given observation"""
-
+    def act(self, obs) -> tuple[Any, float]:
         action_samples = self.model.action_encoder.sample(self.n_samples)
         obs = self.model.observation_encoder.prepare(obs)
 
         q = self.model(obs, action_samples)
-        best_action = q.argmax()
+        value, best_action = q.max(dim=0)
         action = self.model.action_encoder.getitem(action_samples, best_action)
         action = self.model.action_encoder.item(action)
 
-        return action
+        return action, value.item()
 
     def reward(self, reward: float) -> None:
         """Give a reward for last action remembered by the agent"""
         self.gameplays.rewards[-1] += reward
 
-    def remember(self, new_obs, action=None, reward=0, done=False):
-        """
-        Remember the gameplays.
-
-        Args:
-            self: The object itself.
-            new_obs: The new observation.
-            action: The action.
-            reward: The reward.
-            done: The done.
-
-        Returns:
-            None
-        """
+    def remember(self, new_observation, action=None, reward=0, termination=False, truncation=False) -> None:
         if action is None:
             action = self.action_space.sample()
 
-        self.gameplays.append(new_obs, action, reward, done)
+        self.gameplays.append(new_observation, action, reward, termination, truncation)
 
-    def learn(self, batch_size=64) -> float:
+    def learn(self, batch_size=128, min_batch_size=4) -> float:
         """
         Learn from the gameplays.
 
@@ -148,17 +124,20 @@ class QAgent(AgentBase):
         Returns:
             The loss value.
         """
-        if len(self.gameplays) < batch_size:
+
+        batch_size = min(batch_size, len(self.gameplays))
+        if batch_size < min_batch_size:
             return 0.0
 
-        observations, actions, rewards, dones, next_observations = self.gameplays.sample(batch_size)
+        observations, actions, rewards, terminations, next_observations = self.gameplays.sample(
+            batch_size)
 
         action_samples = self.model.action_encoder.sample(self.n_samples)
         action_samples = self.model.action_encoder.getitem(action_samples, None)
         next_qs = self.model(next_observations, action_samples)  # [batch_size, 2]
-        best_q = next_qs.max(1).values.detach()  # [batch_size]
+        best_q = next_qs.max(dim=1).values  # [batch_size]
 
-        q_target = best_q * ~dones * self.gamma + rewards  # [batch_size]
+        q_target = best_q * ~terminations + rewards  # [batch_size]
         actions = self.model.action_encoder.getitem(actions, (slice(None), None))
         qs = self.model(observations, actions).squeeze(1)  # [batch_size, 1]
         loss = F.mse_loss(qs, q_target)
@@ -168,6 +147,13 @@ class QAgent(AgentBase):
         self.optimizer.step()
 
         return loss.item()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        print("agent closed")
+        self.gameplays.close()
 
     def save_pretrained(self, path: Union[str, Path]) -> None:
         """
