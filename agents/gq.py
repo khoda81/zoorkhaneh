@@ -25,6 +25,10 @@ class QModel(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
             nn.Linear(embed_dim, 1)
         )
 
@@ -114,7 +118,7 @@ class QAgent(AgentBase):
 
         self.gameplays.append(new_observation, action, reward, termination, truncation)
 
-    def learn(self, batch_size=128, min_batch_size=4) -> float:
+    def learn(self, batch_size=512, min_batch_size=4) -> float:
         """
         Learn from the gameplays.
 
@@ -129,8 +133,7 @@ class QAgent(AgentBase):
         if batch_size < min_batch_size:
             return 0.0
 
-        observations, actions, rewards, terminations, next_observations = self.gameplays.sample(
-            batch_size)
+        observations, actions, rewards, terminations, next_observations = self.gameplays.sample(batch_size)
 
         action_samples = self.model.action_encoder.sample(self.n_samples)
         action_samples = self.model.action_encoder.getitem(action_samples, None)
@@ -151,8 +154,7 @@ class QAgent(AgentBase):
     def __enter__(self):
         return self
 
-    def __exit__(self):
-        print("agent closed")
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.gameplays.close()
 
     def save_pretrained(self, path: Union[str, Path]) -> None:

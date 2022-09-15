@@ -97,6 +97,9 @@ class TensorEncoder(Encoder):
     def getitem(self, sample, item):
         return sample[item]
 
+    def setitem(self, sample, item, value):
+        return sample.__setitem__(item, value)
+
     def shape(self, sample_batch):
         return sample_batch.shape[:-len(self.space.shape)]
 
@@ -196,6 +199,8 @@ class DiscreteEncoder(TensorEncoder):
     def supports(space: Space) -> bool:
         return isinstance(space, Discrete)
 
+    def item(self, x):
+        return x.item()
 
 class MultiDiscreteEncoder(TensorEncoder):
     def __init__(self, space: MultiDiscrete, embed_dim=256):
@@ -358,6 +363,37 @@ class DictEncoder(Encoder):
             for key, encoder
             in self.encoders.items()
         }
+
+
+
+class TupleEncoder(DictEncoder):
+    def __init__(self, space: Tuple, embed_dim=256):
+        space = Dict({
+            i: subspace
+            for i, subspace
+            in enumerate(space.spaces)
+        })
+        
+        super().__init__(space, embed_dim)
+
+    @staticmethod
+    def supports(space: Space) -> bool:
+        return isinstance(space, Tuple)
+
+    def sample(self, batch_size=1):
+        return tuple(super().sample(batch_size=batch_size).values())
+
+    def concat(self, sample_batch, new_sample):
+        return tuple(super().concat(sample_batch, new_sample).values())
+
+    def getitem(self, sample_batch, item):
+        return tuple(super().getitem(sample_batch, item).values())
+
+    def prepare(self, sample):
+        return tuple(super().prepare(sample).values())
+
+    def item(self, sample):
+        return tuple(super().item(sample).values())
 
 
 encoders = [

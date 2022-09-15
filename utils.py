@@ -18,12 +18,12 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
         A tuple containing the number of steps taken, the total reward, and the
         average loss.
     """
-    observations, info = env.reset()
+    observation, info = env.reset()
     agent.reset()
 
     if train:
         # remember with no action, reward, done
-        agent.remember(observations)
+        agent.remember(observation)
 
     rew_acc = 0
     loss = 0
@@ -39,12 +39,12 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
     with tqdm(count(1), leave=False, total=max_step) as pbar:
         for step in pbar:
             description = ""
-            action, value = agent(observations)
-            observations, reward, termination, truncation, info = env.step(action)
+            action, value = agent(observation)
+            observation, reward, termination, truncation, info = env.step(action)
             rew_acc += reward
 
             if train:
-                agent.remember(observations, action, reward, termination, truncation)
+                agent.remember(observation, action, reward, termination, truncation)
                 loss = agent.learn()
 
                 total_loss += loss
