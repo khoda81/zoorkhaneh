@@ -1,4 +1,5 @@
 from typing import Any
+
 from gym import Space
 
 
@@ -22,7 +23,6 @@ class AgentBase:
 
         Args:
             obs (np.ndarray): Observation from the environment.
-            remember (bool): Whether to remember the action.
 
         Returns:
             The action to take and the value of the action.
@@ -50,7 +50,8 @@ class AgentBase:
             new_observation: The observation after the action.
             action: The action taken.
             reward: The reward received.
-            done: Whether the episode is done.
+            termination: Whether the episode is done.
+            truncation: Whether the episode is truncated.
         """
 
     def learn(self) -> float:

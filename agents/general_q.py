@@ -1,28 +1,38 @@
 import pickle
-import torch
 from pathlib import Path
 from typing import Any, Optional, Union
-from agents.agent import AgentBase
-from agents.encoder import auto_encoder
-from agents.replay_buffer import ReplayMemory
+
+import torch
 from gym.spaces import Space
-from torch.nn import functional as F
 from torch import nn, optim
+from torch.nn import functional as F
+
+from agents.agent import AgentBase
+from agents.replay_buffer import ReplayMemory
+from encoder.encoder import auto_encoder
 
 
 class QModel(nn.Module):
     def __init__(
-        self,
-        action_space: Space,
-        observation_space: Space,
-        action_encoder=auto_encoder,
-        observation_encoder=auto_encoder,
-        embed_dim: int = 1024,
+            self,
+            action_space: Space,
+            observation_space: Space,
+            action_encoder=auto_encoder,
+            observation_encoder=auto_encoder,
+            embed_dim: int = 1024,
     ):
         super().__init__()
         self.action_encoder = action_encoder(action_space, embed_dim)
         self.observation_encoder = observation_encoder(observation_space, embed_dim)
         self.decoder = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.ReLU(),
             nn.Linear(embed_dim, embed_dim),
             nn.ReLU(),
             nn.Linear(embed_dim, embed_dim),
@@ -37,7 +47,7 @@ class QModel(nn.Module):
         Compute q values for each action.
 
         Args:
-            obs: [*batch_shape, *observasion_shape]
+            obs: [*batch_shape, *observation_shape]
             actions: [*batch_shape, m, *action_shape]
 
         Returns:
@@ -59,19 +69,19 @@ class QModel(nn.Module):
         return f"{self.__class__.__name__}(embed_dim={self.observation_encoder.out_features})"
 
 
-class QAgent(AgentBase):
+class GeneralQ(AgentBase):
     def __init__(
-        self,
-        action_space: Space,
-        observation_space: Space,
-        name: str,
-        model: nn.Module = None,
-        device: torch.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        ),
-        lr: float = 1e-3,
-        replay_memory_size: int = 4096,
-        n_samples: int = 32,
+            self,
+            action_space: Space,
+            observation_space: Space,
+            name: str,
+            model: nn.Module = None,
+            device: torch.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            ),
+            lr: float = 1e-3,
+            replay_memory_size: int = 4096,
+            n_samples: int = 32,
     ) -> None:
         super().__init__(action_space, observation_space, name)
 
@@ -118,7 +128,7 @@ class QAgent(AgentBase):
 
         self.gameplays.append(new_observation, action, reward, termination, truncation)
 
-    def learn(self, batch_size=512, min_batch_size=4) -> float:
+    def learn(self, batch_size=512) -> float:
         """
         Learn from the gameplays.
 
@@ -130,7 +140,7 @@ class QAgent(AgentBase):
         """
 
         batch_size = min(batch_size, len(self.gameplays))
-        if batch_size < min_batch_size:
+        if batch_size == 0:
             return 0.0
 
         observations, actions, rewards, terminations, next_observations = self.gameplays.sample(batch_size)
@@ -151,21 +161,22 @@ class QAgent(AgentBase):
 
         return loss.item()
 
+    def reset(self):
+        # set the last transition to invalid
+        self.gameplays.close()
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.gameplays.close()
+        self.reset()
 
-    def save_pretrained(self, path: Union[str, Path]) -> None:
+    def save_pretrained(self, path: Union[str, Path]):
         """
         Save the model to the given path.
 
         Args:
             path: The path to save the model to.
-
-        Returns:
-            None
         """
 
         path = Path(path)
@@ -176,12 +187,13 @@ class QAgent(AgentBase):
     @classmethod
     def load_pretrained(
             cls, path: Union[str, Path],
-            raise_error: bool = True) -> Optional["QAgent"]:
+            raise_error: bool = True) -> Optional["GeneralQ"]:
         """
         Load the model from the given path.
 
         Args:
             path: The path to load the model from.
+            raise_error: Whether to raise an error if the model could not be loaded.
 
         Returns:
             The loaded model or None if the model could not be loaded.

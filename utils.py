@@ -1,4 +1,5 @@
 from itertools import count
+
 from tqdm import tqdm
 
 from agents.agent import AgentBase
@@ -11,7 +12,6 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
     Args:
         env: The environment to run the episode in.
         agent: The agent to use to interact with the environment.
-        render_step: The step interval at which to render the environment.
         train: Whether to train the agent.
 
     Returns:
@@ -25,7 +25,7 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
         # remember with no action, reward, done
         agent.remember(observation)
 
-    rew_acc = 0
+    tot_rew = 0
     loss = 0
     total_loss = 0
     try:
@@ -41,7 +41,7 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
             description = ""
             action, value = agent(observation)
             observation, reward, termination, truncation, info = env.step(action)
-            rew_acc += reward
+            tot_rew += reward
 
             if train:
                 agent.remember(observation, action, reward, termination, truncation)
@@ -49,10 +49,10 @@ def episode(env, agent: AgentBase, train=True) -> tuple[int, float, float]:
 
                 total_loss += loss
 
-            description += f"{loss=:6.3f}, {reward=:6.2f}, {rew_acc=:6.2f}, {value=:6.2f}"
+            description += f"{loss=:6.3f}, {reward=:6.2f}, {tot_rew=:6.2f}, {value=:6.2f}"
             pbar.set_description(description)
 
             if termination or truncation:
                 break
 
-    return step, rew_acc, total_loss / step
+    return step, tot_rew, total_loss / step

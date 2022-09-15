@@ -1,111 +1,175 @@
+import functools
 import math
-import torch
+from abc import ABC, abstractmethod
+from itertools import chain
+from typing import Any, Generator
+
 import numpy as np
-from abc import ABC, abstractclassmethod, abstractmethod
+import torch
+from gym.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete, Space, Tuple
 from torch import nn
-from gym.spaces import Space, Box, Discrete, MultiDiscrete, Tuple, Dict, MultiBinary
 
 
 class Encoder(ABC, nn.Module):
     def __init__(self, space: Space):
         assert self.supports(space), f"{self.__class__.__name__} does not support {space}"
 
-    def __init__(self, space: Space):
         super().__init__()
         self.space = space
         # phantom data to track device
         self.register_buffer("_phantom", torch.empty((0,)))
 
-    @property
-    def device(self):
-        return self._phantom.device
-
-    @abstractclassmethod
-    def supports(cls, space: Space) -> bool:
+    @staticmethod
+    @abstractmethod
+    def supports(space: Space) -> bool:
         """
         Returns whether this encoder supports the given space.
         """
 
+    @property
+    def device(self):
+        return self._phantom.device
+
     @abstractmethod
-    def prepare(self, sample):
+    def prepare(self, sample) -> "Sample":
         """
         Prepare numpy sample for forward pass.
         """
 
     @abstractmethod
-    def sample(self, batch_size=1):
+    def zip(self, *sample_batch: "Sample") -> Generator[list["Sample"], None, None]:
+        """
+        Zip the given sample batches.
+        """
+
+    @abstractmethod
+    def map(self, sample_batch: "Sample", func) -> "Sample":
+        """
+        Map the given function to the batch.
+        """
+
+    @abstractmethod
+    def sample(self, batch_size=1) -> "Sample":
         """
         Sample a batch of samples from the space.
         """
 
-    @abstractmethod
-    def concat(self, sample_batch, new_sample):
-        """
-        Concat a new sample to the given sample batch.
-        """
+    def getitem(self, sample: "Sample", item) -> "Sample":
+        return self.map(sample, lambda x: x[item])
+
+    def setitem(self, sample: "Sample", item, value: "Sample"):
+        return self.map(sample, lambda x: x.__setitem__(item, value))
 
     @abstractmethod
-    def getitem(self, sample_batch, item):
-        pass
-
-    @abstractmethod
-    def setitem(self, sample_batch, item, value):
-        pass
-
-    @abstractmethod
-    def shape(self, sample_batch):
+    def shape(self, sample_batch: "Sample"):
         """
-        Return the batch shpae of the given sample batch.
+        Return the batch shape of the given sample batch.
         """
 
     @abstractmethod
-    def forward(self, x):
+    def forward(self, x: "Sample") -> torch.Tensor:
         """
         Encode the given sample.
         """
 
-    def item(self, x):
+    def item(self, x: "Sample") -> Any:
         return np.array(x)
 
 
-class TensorEncoder(Encoder):
-    def __init__(self, space: Box, encoder: nn.Module):
+class Sample:
+    def __init__(self, encoder: Encoder, data):
+        self.encoder = encoder
+        self.data = data
+
+    @staticmethod
+    def wrap_out(func):
+        """Decorator to wrap a function that returns a sample."""
+
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            return Sample(self, func(self, *args, **kwargs))
+
+        return wrapper
+
+    @staticmethod
+    def unwrap_inp(func):
+        """Decorator to wrap a function that returns a sample."""
+
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            args = (
+                arg.data if isinstance(arg, Sample) else arg
+                for arg in args
+            )
+
+            kwargs = {
+                key: value.data if isinstance(value, Sample) else value
+                for key, value in kwargs.items()
+            }
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    @staticmethod
+    def wrap(func):
+        """Decorator to wrap a function that returns a sample."""
+        return Sample.wrap_out(Sample.unwrap_inp(func))
+
+    def map(self, func):
+        return self.encoder.map(self, func)
+
+    def __repr__(self):
+        return f"Sample({self.encoder}, {self.data})"
+
+    def __getitem__(self, key):
+        return self.map(lambda x: x[key])
+
+    def __setitem__(self, key, value):
+        for dst, src in self.encoder.zip(self.data, value.data):
+            dst.data[key] = src.data
+
+
+class TensorEncoder(Encoder, ABC):
+    def __init__(self, space: Space, encoder: nn.Module):
         super().__init__(space)
         self.dtype = torch.tensor(space.sample()).dtype
         self.encoder = encoder
 
+    @Sample.wrap_out
     def prepare(self, sample):
         return torch.tensor(sample, dtype=self.dtype, device=self.device)
 
+    @Sample.unwrap_inp
+    def zip(self, *sample_batch):
+        yield sample_batch
+
+    @Sample.wrap
+    def map(self, sample_batch, func):
+        return func(sample_batch)
+
+    @Sample.wrap_out
     def sample(self, batch_size=1, minibatch_size=64):
+        # TODO experiment with different minibatch sizes
         samples = []
         for i in range(0, batch_size, minibatch_size):
-            minisize = min(batch_size - i, minibatch_size)
             minibatch = np.array([
                 self.space.sample()
-                for _ in range(minisize)
+                for _ in range(min(batch_size - i, minibatch_size))
             ])
 
-            mini_batch = self.prepare(minibatch)
-            samples.append(mini_batch)
+            samples.append(self.prepare(minibatch).data)
 
         return torch.cat(samples)
 
-    def concat(self, sample_batch, new_sample):
-        return torch.cat([sample_batch, new_sample])
-
-    def getitem(self, sample, item):
-        return sample[item]
-
-    def setitem(self, sample, item, value):
-        return sample.__setitem__(item, value)
-
     def shape(self, sample_batch):
-        return sample_batch.shape[:-len(self.space.shape)]
+        return sample_batch.data.shape[:-len(self.space.shape)]
 
+    @Sample.unwrap_inp
     def forward(self, x):
         return self.encoder(x)
 
+    @Sample.unwrap_inp
     def item(self, x):
         return np.array(x.to(torch.device('cpu')))
 
@@ -137,36 +201,30 @@ class ByteImageEncoder(TensorEncoder):
     @staticmethod
     def supports(space: Space) -> bool:
         if not (
-            type(space) == Box and
-            space.dtype == np.uint8 and
-            len(space.shape) == 3 and
-            space.low.min() == 0 and
-            space.high.max() == 255
+                type(space) == Box and
+                space.dtype == np.uint8 and
+                len(space.shape) == 3 and
+                space.low.min() == 0 and
+                space.high.max() == 255
         ):
             return False
 
         h, w, c = space.shape
         return c == 3 and h >= 30 and w >= 30
 
-    def forward(self, x):
-        x = x.to(torch.float32) / 255.0 - .5
-        return self.encoder(x)
-
+    @Sample.wrap_out
     def prepare(self, sample):
-        # rearange last three dimensions to be (c, h, w)
-        return (
-            super()
-            .prepare(sample)
-            .transpose(-1, -3)
-        )
+        # rearrange last three dimensions to be (c, h, w)
+        return super().prepare(sample).transpose(-1, -3)
 
+    @Sample.unwrap_inp
+    def forward(self, x):
+        return self.encoder(x.to(torch.float32) / 255.0 - .5)
+
+    @Sample.unwrap_inp
     def item(self, x):
-        return np.array(
-            x
-            .transpose(-1, -3)
-            .to(torch.device('cpu')),
-            dtype=np.uint8
-        )
+        x = x.transpose(-1, -3).to(torch.device('cpu'))
+        return np.array(x, dtype=np.uint8)
 
 
 class BoxEncoder(TensorEncoder):
@@ -182,12 +240,12 @@ class BoxEncoder(TensorEncoder):
     @classmethod
     def supports(cls, space: Space) -> bool:
         return (
-            type(space) == Box and
-            space.dtype in [
-                np.float16,
-                np.float32,
-                np.float64,
-            ]
+                type(space) == Box and
+                space.dtype in [
+                    np.float16,
+                    np.float32,
+                    np.float64,
+                ]
         )
 
 
@@ -199,8 +257,10 @@ class DiscreteEncoder(TensorEncoder):
     def supports(space: Space) -> bool:
         return isinstance(space, Discrete)
 
+    @Sample.unwrap_inp
     def item(self, x):
         return x.item()
+
 
 class MultiDiscreteEncoder(TensorEncoder):
     def __init__(self, space: MultiDiscrete, embed_dim=256):
@@ -218,6 +278,7 @@ class MultiDiscreteEncoder(TensorEncoder):
     def supports(space: Space) -> bool:
         return type(space) == MultiDiscrete
 
+    @Sample.unwrap_inp
     def forward(self, x):
         return torch.sum(
             torch.stack(
@@ -243,68 +304,6 @@ class MultiBinaryEncoder(TensorEncoder):
         return type(space) == MultiBinary
 
 
-class TupleEncoder(Encoder):
-    def __init__(self, space: Tuple, embed_dim=256):
-        super().__init__(space)
-        self.encoders = nn.ModuleList([
-            auto_encoder(subspace, embed_dim)
-            for subspace in space.spaces
-        ])
-
-    @staticmethod
-    def supports(space: Space) -> bool:
-        return isinstance(space, Tuple)
-
-    def sample(self, batch_size=1):
-        return tuple(
-            encoder.sample(batch_size)
-            for encoder in self.encoders
-        )
-
-    def concat(self, sample_batch, new_sample):
-        return tuple(
-            encoder.concat(subsample_batch, subsample)
-            for encoder, subsample_batch, subsample
-            in zip(self.encoders, sample_batch, new_sample)
-        )
-
-    def getitem(self, sample_batch, item):
-        return tuple(
-            encoder.getitem(subsample_batch, item)
-            for encoder, subsample_batch
-            in zip(self.encoders, sample_batch)
-        )
-
-    def shape(self, sample_batch):
-        for encoder, subsample_batch in zip(self.encoders, sample_batch):
-            shape = encoder.shape(subsample_batch)
-            if shape:
-                return shape
-
-    def prepare(self, sample):
-        return tuple(
-            encoder.prepare(subsample)
-            for encoder, subsample
-            in zip(self.encoders, sample)
-        )
-
-    def forward(self, x):
-        return torch.sum(
-            torch.stack(
-                [encoder(x[i]) for i, encoder in enumerate(self.encoders)],
-                dim=-1
-            ),
-            dim=-1,
-        )
-
-    def item(self, sample):
-        return tuple(
-            encoder.item(subsample)
-            for encoder, subsample
-            in zip(self.encoders, sample)
-        )
-
-
 class DictEncoder(Encoder):
     def __init__(self, space: Dict, embed_dim=256):
         super().__init__(space)
@@ -317,16 +316,37 @@ class DictEncoder(Encoder):
     def supports(space: Space) -> bool:
         return isinstance(space, Dict)
 
-    def concat(self, sample_batch, new_sample):
+    @Sample.wrap_out
+    def prepare(self, sample):
         return {
-            key: encoder.concat(sample_batch[key], new_sample[key])
+            key: encoder.prepare(sample[key])
             for key, encoder
             in self.encoders.items()
         }
 
-    def getitem(self, sample_batch, item):
+    @Sample.unwrap_inp
+    def zip(self, *sample_batches):
+        return chain.from_iterable([
+            encoder.zip(*map(
+                lambda sample_batch: sample_batch[key],
+                sample_batches
+            ))
+            for key, encoder
+            in self.encoders.items()
+        ])
+
+    @Sample.wrap
+    def map(self, sample_batch, func):
         return {
-            key: encoder.getitem(sample_batch[key], item)
+            key: encoder.map(sample_batch[key], func)
+            for key, encoder
+            in self.encoders.items()
+        }
+
+    @Sample.wrap_out
+    def sample(self, batch_size=1):
+        return {
+            key: encoder.sample(batch_size=batch_size)
             for key, encoder
             in self.encoders.items()
         }
@@ -337,13 +357,7 @@ class DictEncoder(Encoder):
             if shape:
                 return shape
 
-    def prepare(self, sample):
-        return {
-            key: encoder.prepare(sample[key])
-            for key, encoder
-            in self.encoders.items()
-        }
-
+    @Sample.unwrap_inp
     def forward(self, x):
         return torch.sum(
             torch.stack(
@@ -357,13 +371,13 @@ class DictEncoder(Encoder):
             dim=-1,
         )
 
+    @Sample.unwrap_inp
     def item(self, sample):
         return {
             key: encoder.item(sample[key])
             for key, encoder
             in self.encoders.items()
         }
-
 
 
 class TupleEncoder(DictEncoder):
@@ -373,24 +387,15 @@ class TupleEncoder(DictEncoder):
             for i, subspace
             in enumerate(space.spaces)
         })
-        
+
         super().__init__(space, embed_dim)
 
     @staticmethod
     def supports(space: Space) -> bool:
         return isinstance(space, Tuple)
 
-    def sample(self, batch_size=1):
-        return tuple(super().sample(batch_size=batch_size).values())
-
-    def concat(self, sample_batch, new_sample):
-        return tuple(super().concat(sample_batch, new_sample).values())
-
-    def getitem(self, sample_batch, item):
-        return tuple(super().getitem(sample_batch, item).values())
-
     def prepare(self, sample):
-        return tuple(super().prepare(sample).values())
+        return super().prepare(dict(enumerate(sample)))
 
     def item(self, sample):
         return tuple(super().item(sample).values())
