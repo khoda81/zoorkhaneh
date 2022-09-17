@@ -1,0 +1,24 @@
+{
+    "os": "Windows-10-10.0.22000-SP0",
+    "python": "3.9.12",
+    "heartbeatAt": "2022-09-17T09:46:35.108625",
+    "startedAt": "2022-09-17T09:46:33.199274",
+    "docker": null,
+    "gpu": "NVIDIA GeForce GTX 1660 Ti",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "example.py",
+    "codePath": "example.py",
+    "git": {
+        "remote": "https://github.com/khoda81/general-q.git",
+        "commit": "f81efd3fd29d9de0cab77f791b52c3dad7638a5e"
+    },
+    "email": "20.mahdikh.0@gmail.com",
+    "root": "C:/Users/20mah/Projects/data-science/RL/general_q",
+    "host": "bache",
+    "username": "20mah",
+    "executable": "C:\\Users\\20mah\\anaconda3\\envs\\data-science\\python.exe"
+}

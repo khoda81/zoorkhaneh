@@ -10,13 +10,13 @@
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
-      "justMyCode": true
+      "justMyCode": false
     },
     {
-      "name": "Python: Train",
+      "name": "Run example.py",
       "type": "python",
       "request": "launch",
-      "program": "main.py",
+      "program": "example.py",
       "console": "integratedTerminal",
       "justMyCode": false
     }
