@@ -2,9 +2,12 @@ from typing import Optional
 
 import random
 from abc import ABC
+from pathlib import Path
 
 from gym import Space
 from gym.core import ActType, ObsType
+
+NAMES_PATH = Path(__file__).parent / "first-names.txt"
 
 
 class Agent(ABC):
@@ -23,7 +26,7 @@ class Agent(ABC):
             name: The name of the agent.
         """
         if name is None:
-            with open("first-names.txt") as f:
+            with open(NAMES_PATH) as f:
                 names = f.read().splitlines()
 
             name = random.choice(names)
@@ -100,4 +103,4 @@ class Agent(ABC):
         return self.act(obs)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.name})"
+        return f'{self.__class__.__name__}(name={self.name!r})'

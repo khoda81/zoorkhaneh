@@ -1,64 +1,58 @@
 from itertools import count
 
 from gym import Env
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from general_q.agents import Agent
 
 
-def episode(env: Env, agent: Agent, train=True) -> tuple[int, float, float]:
+def play(env: Env, agent: Agent, steps: int, train: bool = True) -> None:
     """
     Run a single episode of the environment.
 
     Args:
         env: The environment to run the episode in.
         agent: The agent to use to interact with the environment.
+        steps: The number of steps to run the environment for.
         train: Whether to train the agent.
-
-    Returns:
-        A tuple containing the number of steps taken, the total reward, and the
-        average loss.
     """
-    observation, info = env.reset()
-    agent.reset()
-
-    if train:
-        # remember with no action, reward, done
-        agent.remember(observation)
-
-    tot_rew = 0
-    loss = 0
-    total_loss = 0
     try:
         max_step = env.spec.max_episode_steps
     except AttributeError:
         max_step = None
 
-    # count() is a generator that counts up
-    # leave=False means that the progress bar will be cleared after each episode
-    # useful for running multiple episodes in a loop with tqdm progress bar
-    with tqdm(count(1), leave=False, total=max_step) as pbar:
-        for step in pbar:
-            description = ""
-            action, value = agent(observation)
-            observation, reward, termination, truncation, info = env.step(
-                action
-            )
-            tot_rew += reward
+
+    with trange(steps) as step_pbar:
+        while True:
+            observation, info = env.reset()
+            agent.reset()
 
             if train:
-                agent.remember(
-                    observation, action, reward, termination, truncation
-                )
-                loss = agent.learn()
+                agent.remember(observation)
+        
+            tot_rew = 0
+            eps_loss = 0
+            with tqdm(count(1), leave=False, total=max_step) as episode_pbar:
+                for _ in episode_pbar:
+                    action, value = agent(observation)
+                    observation, reward, termination, truncation, info = env.step(action)
+                    tot_rew += reward
 
-                total_loss += loss
+                    description = ""
+                    if train:
+                        agent.remember(observation, action, reward, termination, truncation)
+                        loss = agent.learn()
+                        description += f"{loss=:6.3f}, "
+                        eps_loss += loss
 
-            pbar.set_description(
-                f"{loss=:6.3f}, {reward=:6.2f}, {tot_rew=:6.2f}, {value=:6.2f}"
-            )
+                    description += f"{reward=:6.2f}, {tot_rew=:6.2f}, {value=:6.2f}"
+                    episode_pbar.set_description(description)
+                    step_pbar.update()
 
-            if termination or truncation:
-                break
+                    if step_pbar.n >= steps:
+                        return
+                    
+                    if termination or truncation:
+                        break
 
-    return step, tot_rew, total_loss / step
+            step_pbar.set_description(f"last_reward: {tot_rew:6.2f}")

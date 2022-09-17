@@ -9,7 +9,8 @@ from gym.spaces import Space
 from torch import nn, optim
 from torch.nn import functional as F
 
-from general_q.agents import Agent, ReplayMemory
+from general_q.agents.base import Agent
+from general_q.agents.replay_memory import ReplayMemory
 from general_q.encoders import auto_encoder
 
 
@@ -180,14 +181,16 @@ class GeneralQ(Agent):
             path: The path to save the model to.
         """
 
-        path = Path(path)
+        path = Path(path) / f"{self.name}.{self.__class__.__name__}"
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump(self, f)
 
     @classmethod
     def load_pretrained(
-        cls, path: Union[str, Path], raise_error: bool = True
+        cls, 
+        path: Union[str, Path], 
+        raise_error: bool = True
     ) -> Optional["GeneralQ"]:
         """
         Load the model from the given path.

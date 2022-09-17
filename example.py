@@ -1,22 +1,31 @@
+from typing import Optional
+
+import os
+from pathlib import Path
+
 import gym
-from tqdm import trange
 
-import wandb
-from general_q.agents import GeneralQ
-from general_q.utils import episode
+from general_q.agents import Agent, GeneralQ
+from general_q.utils import play
 
-AGENT_NAME = "Mira-Cart"
-AGENT_CLASS = GeneralQ
-SAVE_PATH = f"agents/pretrained/{AGENT_NAME}.{AGENT_CLASS.__name__}"
+SAVE_PATH = Path("tmp/pretrained/")
+
+
+def last_saved_model(path: str) -> Optional[str]:
+    path = Path(path)
+    files = {
+        path: path.stat().st_mtime
+        for path in path.iterdir()
+    }
+
+    return max(files, key=files.get, default=None)
 
 
 def train(episodes=2000) -> None:
-    wandb.init(project="gq-agents")
-
-    # env = gym.make("CartPole-v1", render_mode="human")
-    env = gym.wrappers.TransformReward(
-        gym.make("LunarLander-v2", render_mode="human"), lambda r: 0.1 * r
-    )
+    env = gym.make("CartPole-v1", render_mode="human")
+    # env = gym.wrappers.TransformReward(
+    #     gym.make("LunarLander-v2", render_mode="human"), lambda r: 0.1 * r
+    # )
     # env = gym.make("Acrobot-v1", render_mode="human")
     # env = gym.wrappers.TransformReward(gym.make('Pendulum-v1', render_mode="human"), lambda r: 0.1*r)
     # env = gym.make("MountainCarContinuous-v0", render_mode="human")
@@ -27,30 +36,23 @@ def train(episodes=2000) -> None:
     # env = gym.make("BipedalWalker-v3", render_mode="human")
     # env = gym.make("Blackjack-v1", render_mode="human")
 
-    agent = GeneralQ.load_pretrained(SAVE_PATH, raise_error=False) or GeneralQ(
-        env.action_space,
-        env.observation_space,
-        AGENT_NAME,
-        n_samples=32,
-    )
+    SAVE_PATH.mkdir(parents=True, exist_ok=True)
+    path = last_saved_model(SAVE_PATH)
+    agent: Agent = \
+        path and GeneralQ.load_pretrained(path, raise_error=False) or \
+        GeneralQ(
+            env.action_space,
+            env.observation_space,
+            n_samples=8,
+        )
 
-    with env, agent, trange(episodes) as pbar:
-        for _ in pbar:
-            steps, reward, mean_loss = episode(env, agent, train=True)
+    print("Training:")
+    print(f"\tAgent: {agent}")
+    print(f"\tEnvironment: {env}")
 
-            pbar.set_description(
-                f"{steps=:3d}, " f"{reward=:6.3f}, " f"{mean_loss=:6.3f}"
-            )
-
-            wandb.log(
-                {
-                    "steps": steps,
-                    "reward": reward,
-                    "loss": mean_loss,
-                }
-            )
-
-            agent.save_pretrained(SAVE_PATH)
+    with env, agent:
+        play(env, agent, 1000, train=True)
+        agent.save_pretrained(SAVE_PATH)
 
 
 if __name__ == "__main__":

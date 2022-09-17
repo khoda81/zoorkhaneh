@@ -615,6 +615,5 @@ healthchecksdb
 MigrationBackup/
 
 # End of https://www.gitignore.io/api/osx,python,pycharm,windows,visualstudio,visualstudiocode
-/local_tests/wandb/
-/local_tests/models/pretrained/
-/local_tests/
+/wandb/
+/tmp/
