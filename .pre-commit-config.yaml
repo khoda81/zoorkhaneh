@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.9
 
-default_stages: [commit, push]
+default_stages: [ commit, push ]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -16,7 +16,7 @@ repos:
       - id: pyupgrade
         name: pyupgrade
         entry: poetry run pyupgrade --py39-plus
-        types: [python]
+        types: [ python ]
         language: system
 
   - repo: local
@@ -24,5 +24,5 @@ repos:
       - id: isort
         name: isort
         entry: poetry run isort --settings-path pyproject.toml .
-        types: [python]
+        types: [ python ]
         language: system

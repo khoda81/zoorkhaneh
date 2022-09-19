@@ -37,7 +37,6 @@ class ReplayMemory:
         termination=False,
         truncation=False,
     ) -> None:
-
         # TODO profile append
         self.last = (self.last + 1) % self.capacity
 

@@ -33,7 +33,8 @@ poetry add general-q
 
 [![License](https://img.shields.io/github/license/khoda81/general-q)](https://github.com/khoda81/general-q/blob/master/LICENSE)
 
-This project is licensed under the terms of the `MIT` license. See [LICENSE](https://github.com/khoda81/general-q/blob/master/LICENSE) for more details.
+This project is licensed under the terms of the `MIT` license.
+See [LICENSE](https://github.com/khoda81/general-q/blob/master/LICENSE) for more details.
 
 ## 📃 Citation
 

@@ -11,7 +11,7 @@ from torch.nn import functional as F
 
 from general_q.agents.base import Agent
 from general_q.agents.replay_memory import ReplayMemory
-from general_q.encoders import auto_encoder
+from general_q.encoders import Encoder
 
 
 class Q(nn.Module):
@@ -19,15 +19,13 @@ class Q(nn.Module):
         self,
         action_space: Space[ActType],
         observation_space: Space[ObsType],
-        action_encoder=auto_encoder,
-        observation_encoder=auto_encoder,
+        action_encoder=Encoder,
+        observation_encoder=Encoder,
         embed_dim: int = 256,
     ):
         super().__init__()
-        self.action_encoder = action_encoder(action_space, embed_dim)
-        self.observation_encoder = observation_encoder(
-            observation_space, embed_dim
-        )
+        self.action_encoder = action_encoder.auto_encoder(action_space, embed_dim)
+        self.observation_encoder = observation_encoder.auto_encoder(observation_space, embed_dim)
         self.decoder = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.ReLU(),
@@ -188,8 +186,8 @@ class GeneralQ(Agent):
 
     @classmethod
     def load_pretrained(
-        cls, 
-        path: Union[str, Path], 
+        cls,
+        path: Union[str, Path],
         raise_error: bool = True
     ) -> Optional["GeneralQ"]:
         """

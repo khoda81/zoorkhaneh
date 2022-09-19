@@ -1,7 +1,6 @@
 # type: ignore[attr-defined]
 """An easy to use library for general purpose reinforcement learning and experimentation"""
 
-import sys
 from importlib import metadata as importlib_metadata
 
 

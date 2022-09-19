@@ -1,5 +1,6 @@
+import functools
 import math
-from abc import ABC
+from abc import ABC, abstractmethod
 from itertools import chain
 
 import numpy as np
@@ -7,7 +8,140 @@ import torch
 from gym.spaces import *
 from torch import nn
 
-from general_q.encoders import Encoder, Sample
+
+class Sample:
+    def __init__(self, encoder, data):
+        self.encoder = encoder
+        self.data = data
+
+    @staticmethod
+    def wrap_out(func):
+        """Decorator to wrap a function that returns a sample."""
+
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            return Sample(self, func(self, *args, **kwargs))
+
+        return wrapper
+
+    @staticmethod
+    def unwrap_inp(func):
+        """Decorator to wrap a function that returns a sample."""
+
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            args = (
+                arg.data if isinstance(arg, Sample) else arg for arg in args
+            )
+
+            kwargs = {
+                key: value.data if isinstance(value, Sample) else value
+                for key, value in kwargs.items()
+            }
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    @staticmethod
+    def wrap(func):
+        """Decorator to wrap a function that returns a sample."""
+        return Sample.wrap_out(Sample.unwrap_inp(func))
+
+    def map(self, func):
+        return self.encoder.map(self, func)
+
+    def item(self):
+        return self.encoder.item(self)
+
+    def __repr__(self):
+        return f"Sample({self.encoder}, {self.data})"
+
+    def __getitem__(self, key):
+        return self.map(lambda x: x[key])
+
+    def __setitem__(self, key, value):
+        for dst, src in self.encoder.zip(self.data, value.data):
+            dst.data[key] = src.data
+
+
+class Encoder(nn.Module, ABC):
+    def __init__(self, space) -> None:
+        assert self.supports(
+            space
+        ), f"{self.__class__.__name__} does not support {space}"
+
+        super().__init__()
+        self.space = space
+        # phantom data to track device
+        self.register_buffer("_phantom", torch.empty((0,)))
+
+    @property
+    def device(self) -> torch.device:
+        return self._phantom.device
+
+    @classmethod
+    def auto_encoder(cls, space: Space, embed_dim=256) -> "Encoder":
+        for encoder in [
+            cls,
+            ByteImageEncoder,
+            BoxEncoder,
+            DiscreteEncoder,
+            MultiDiscreteEncoder,
+            MultiBinaryEncoder,
+            TupleEncoder,
+            DictEncoder,
+        ]:
+            if encoder.supports(space):
+                return encoder(space, embed_dim=embed_dim)
+
+        raise ValueError(f"No encoder found for {space}. Consider writing one.")
+
+    @staticmethod
+    def supports(space) -> bool:
+        """
+        Returns whether this encoder supports the given space.
+        """
+        return False
+
+    @abstractmethod
+    def prepare(self, sample):
+        """
+        Prepare numpy sample for forward pass.
+        """
+
+    @abstractmethod
+    def zip(self, *sample_batch):
+        """
+        Zip the given sample batches.
+        """
+
+    @abstractmethod
+    def map(self, sample_batch, func):
+        """
+        Map the given function to the batch.
+        """
+
+    @abstractmethod
+    def sample(self, batch_size: int = 1):
+        """
+        Sample a batch of samples from the space.
+        """
+
+    @abstractmethod
+    def shape(self, sample_batch) -> tuple:
+        """
+        Return the batch shape of the given sample batch.
+        """
+
+    @abstractmethod
+    def forward(self, x) -> torch.FloatTensor:
+        """
+        Encode the given sample.
+        """
+
+    def item(self, x):
+        return np.array(x)
 
 
 class TensorEncoder(Encoder, ABC):
@@ -185,12 +319,10 @@ class MultiBinaryEncoder(TensorEncoder):
 class DictEncoder(Encoder):
     def __init__(self, space: Dict, embed_dim=256):
         super().__init__(space)
-        self.encoders = nn.ModuleDict(
-            {
-                key: auto_encoder(subspace, embed_dim)
-                for key, subspace in space.spaces.items()
-            }
-        )
+        self.encoders = nn.ModuleDict({
+            key: self.auto_encoder(subspace, embed_dim)
+            for key, subspace in space.spaces.items()
+        })
 
     @staticmethod
     def supports(space: Space) -> bool:
@@ -255,7 +387,6 @@ class DictEncoder(Encoder):
 class TupleEncoder(DictEncoder):
     def __init__(self, space: Tuple, embed_dim=256):
         space = Dict({i: subspace for i, subspace in enumerate(space.spaces)})
-
         super().__init__(space, embed_dim)
 
     @staticmethod
@@ -267,32 +398,3 @@ class TupleEncoder(DictEncoder):
 
     def item(self, sample):
         return tuple(super().item(sample).values())
-
-
-encoders = [
-    ByteImageEncoder,
-    BoxEncoder,
-    DiscreteEncoder,
-    MultiDiscreteEncoder,
-    MultiBinaryEncoder,
-    TupleEncoder,
-    DictEncoder,
-]
-
-
-def auto_encoder(space: Space, embed_dim=256):
-    """
-    Automatically select an encoder for a given space.
-    """
-    for encoder in encoders:
-        if encoder.supports(space):
-            return encoder(space, embed_dim)
-
-    raise ValueError(f"No encoder found for space {space}")
-
-
-def register_encoder(encoder: Encoder, index=0):
-    """
-    Register a new encoder.
-    """
-    encoders.insert(index, encoder)

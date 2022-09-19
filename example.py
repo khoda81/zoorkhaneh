@@ -1,9 +1,9 @@
 from typing import Optional
 
-import os
 from pathlib import Path
 
 import gym
+import wandb
 
 from general_q.agents import Agent, GeneralQ
 from general_q.utils import play
@@ -11,17 +11,7 @@ from general_q.utils import play
 SAVE_PATH = Path("tmp/pretrained/")
 
 
-def last_saved_model(path: str) -> Optional[str]:
-    path = Path(path)
-    files = {
-        path: path.stat().st_mtime
-        for path in path.iterdir()
-    }
-
-    return max(files, key=files.get, default=None)
-
-
-def train(episodes=2000) -> None:
+def train(wandb_project="general-q") -> None:
     env = gym.make("CartPole-v1", render_mode="human")
     # env = gym.wrappers.TransformReward(
     #     gym.make("LunarLander-v2", render_mode="human"), lambda r: 0.1 * r
@@ -36,23 +26,67 @@ def train(episodes=2000) -> None:
     # env = gym.make("BipedalWalker-v3", render_mode="human")
     # env = gym.make("Blackjack-v1", render_mode="human")
 
-    SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    path = last_saved_model(SAVE_PATH)
-    agent: Agent = \
-        path and GeneralQ.load_pretrained(path, raise_error=False) or \
-        GeneralQ(
-            env.action_space,
-            env.observation_space,
-            n_samples=8,
-        )
+    agent: Agent = load_agent(SAVE_PATH, env) or create_agent(env)
 
     print("Training:")
     print(f"\tAgent: {agent}")
     print(f"\tEnvironment: {env}")
 
+    def save_agent(step, *args, **kwargs):
+        if step % 1000 == 0:
+            agent.save_pretrained(SAVE_PATH)
+
+    def log_to_wandb(step, episode_length, loss, reward, *args, **kwargs):
+        wandb.log({
+            "step": step,
+            "loss": loss,
+            "reward": reward,
+            "episode_length": episode_length,
+        })
+
+    wandb.init(
+        project=wandb_project,
+        dir=SAVE_PATH.parent,
+        name=str(agent)
+    )
+
     with env, agent:
-        play(env, agent, 1000, train=True)
-        agent.save_pretrained(SAVE_PATH)
+        play(
+            env,
+            agent,
+            500000,
+            train=True,
+            step_callback=save_agent,
+            episode_callback=log_to_wandb
+        )
+
+def load_agent(path, env: gym.Env) -> Optional[Agent]:
+    path = Path(path)
+
+    if not path.exists():
+        return None
+
+    best = -float("inf"), None
+    for path in path.iterdir():
+        agent = GeneralQ.load_pretrained(path, raise_error=False)
+        if agent is None:
+            continue
+
+        if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
+            continue
+        
+        candidate = path.stat().st_mtime, agent
+        best = max(best, candidate)
+
+    time, agent = best
+    return agent
+
+def create_agent(env) -> Agent:
+    return GeneralQ(
+        env.action_space,
+        env.observation_space,
+        n_samples=8,
+    )
 
 
 if __name__ == "__main__":
