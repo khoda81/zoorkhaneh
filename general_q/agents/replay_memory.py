@@ -5,13 +5,13 @@ from general_q.encoders import Encoder
 
 class ReplayMemory:
     def __init__(
-        self,
-        observation_encoder: Encoder,
-        action_encoder: Encoder,
-        capacity: int,
-        device: torch.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        ),
+            self,
+            observation_encoder: Encoder,
+            action_encoder: Encoder,
+            capacity: int,
+            device: torch.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            ),
     ):
         self.observations = observation_encoder.sample(capacity)
         self.actions = action_encoder.sample(capacity)
@@ -29,13 +29,13 @@ class ReplayMemory:
         self.last = capacity - 1
         self.size = 0
 
-    def append(
-        self,
-        new_observation,
-        action,
-        reward=0.0,
-        termination=False,
-        truncation=False,
+    def push(
+            self,
+            new_observation,
+            action,
+            reward=0.0,
+            termination=False,
+            truncation=False,
     ) -> None:
         # TODO profile append
         self.last = (self.last + 1) % self.capacity

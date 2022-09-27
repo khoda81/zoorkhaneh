@@ -12,10 +12,10 @@ NAMES_PATH = Path(__file__).parent / "first-names.txt"
 
 class Agent(ABC):
     def __init__(
-        self,
-        action_space: Space[ActType],
-        observation_space: Space[ObsType],
-        name: Optional[str] = None,
+            self,
+            action_space: Space[ActType],
+            observation_space: Space[ObsType],
+            name: Optional[str] = None,
     ) -> None:
         """
         Initialize the class.
@@ -47,26 +47,18 @@ class Agent(ABC):
         """
         return self.action_space.sample(), 0.0
 
-    def reward(self, reward: float) -> None:
-        """
-        Reward the agent for its last action.
-
-        Args:
-            reward: The reward value.
-        """
-
     def reset(self) -> None:
         """
         Reset the state of the agent. And get ready for next episode.
         """
 
     def remember(
-        self,
-        new_observation: ObsType,
-        action: Optional[ActType] = None,
-        reward: float = 0.0,
-        termination: bool = False,
-        truncation: bool = False,
+            self,
+            new_observation: ObsType,
+            action: Optional[ActType] = None,
+            reward: float = 0.0,
+            termination: bool = False,
+            truncation: bool = False,
     ) -> None:
         """
         Remember the action taken.

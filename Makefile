@@ -15,6 +15,10 @@ install:
 	poetry install -n
 	-poetry run mypy --install-types --non-interactive ./
 
+.PHONY: publish
+publish:
+	poetry publish --build --username $ENV:PYPI_USERNAME --password $ENV:PYPI_PASSWORD
+
 .PHONY: pre-commit-install
 pre-commit-install:
 	poetry run pre-commit install

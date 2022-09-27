@@ -11,119 +11,90 @@ from torch.nn import functional as F
 
 from general_q.agents.base import Agent
 from general_q.agents.replay_memory import ReplayMemory
-from general_q.encoders import Encoder
+from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
 
-class Q(nn.Module):
+class GeneralQ(Agent, nn.Module):
     def __init__(
-        self,
-        action_space: Space[ActType],
-        observation_space: Space[ObsType],
-        action_encoder=Encoder,
-        observation_encoder=Encoder,
-        embed_dim: int = 256,
-    ):
-        super().__init__()
-        self.action_encoder = action_encoder.auto_encoder(action_space, embed_dim)
-        self.observation_encoder = observation_encoder.auto_encoder(observation_space, embed_dim)
-        self.decoder = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, 1),
-        )
-
-    def forward(self, obs, actions) -> torch.Tensor:
-        """
-        Compute q values for each action.
-
-        Args:
-            obs: [*batch_shape, *observation_shape]
-            actions: [*batch_shape, m, *action_shape]
-
-        Returns:
-            qs: [*batch_shape, m]
-        """
-        obs_embedding = self.observation_encoder(obs).unsqueeze(
-            -2
-        )  # [*batch_shape, 1, embed_dim]
-        action_embedding = self.action_encoder(
-            actions
-        )  # [*batch_shape, m, embed_dim]
-        embedding = (
-            obs_embedding + action_embedding
-        )  # [*batch_shape, m, embed_dim]
-        qs = self.decoder(embedding)  # [*batch_shape, m, 1]
-        return qs.squeeze(-1)  # [*batch_shape, m]
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(embed_dim={self.observation_encoder.out_features})"
-
-
-class GeneralQ(Agent):
-    def __init__(
-        self,
-        action_space: Space[ActType],
-        observation_space: Space[ObsType],
-        name: Optional[str] = None,
-        q: Optional[nn.Module] = None,
-        device: torch.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        ),
-        lr: float = 1e-3,
-        replay_memory_size: int = 4096,
-        n_samples: int = 8,
+            self,
+            action_space: Space[ActType],
+            observation_space: Space[ObsType],
+            name: Optional[str] = None,
+            action_encoder=DiscreteEncoder,
+            observation_encoder=auto_encoder,
+            q: Optional[nn.Module] = None,
+            embed_dim: int = 256,
+            device: torch.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            ),
+            lr: float = 1e-3,
+            replay_memory_size: int = 4096,
     ) -> None:
-        super().__init__(action_space, observation_space, name)
+        Agent.__init__(self, action_space, observation_space, name)
+        nn.Module.__init__(self)
 
         self.device = device
         if q is None:
-            q = Q(self.action_space, self.observation_space)
+            q = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, 1),
+                nn.Flatten(-2),
+            )
 
-        self.q = q.to(self.device)
-        self.optimizer = optim.Adam(
-            self.q.parameters(),
-            lr=lr,
-        )
+            q.optimizer = optim.Adam(q.parameters(), lr=lr)
+
+        self.q = q
+
+        self.action_encoder = action_encoder(action_space, embed_dim)
+        assert isinstance(self.action_encoder, Encoder), f"{self.action_encoder} should inherit from {Encoder}"
+
+        self.observation_encoder = observation_encoder(observation_space, embed_dim)
+        assert isinstance(self.observation_encoder, Encoder), f"{self.observation_encoder} should inherit from {Encoder}"
+
+        self.to(self.device)
 
         self.gameplays = ReplayMemory(
-            action_encoder=self.q.action_encoder,
-            observation_encoder=self.q.observation_encoder,
+            action_encoder=self.action_encoder,
+            observation_encoder=self.observation_encoder,
             capacity=replay_memory_size,
         )
 
-        self.n_samples = n_samples
-
+    @torch.no_grad()
     def act(self, obs: ObsType) -> tuple[ActType, float]:
-        action_samples = self.q.action_encoder.sample(self.n_samples)
-        obs = self.q.observation_encoder.prepare(obs)
+        obs = self.observation_encoder.prepare(obs)
+        obs_embeddings = self.observation_encoder(obs)
+        actions, action_embeddings = self.action_encoder.all()
 
-        values = self.q(obs, action_samples)
+        values = self.q(obs_embeddings + action_embeddings)
         best_value, best_action = values.max(dim=0)
-        action = action_samples[best_action].item()
+        action = actions[best_action].item()
 
         return action, best_value.item()
 
-    def reward(self, reward: float) -> None:
-        """Give a reward for last action remembered by the agent"""
-        self.gameplays.rewards[-1] += reward
-
     def remember(
-        self,
-        new_observation,
-        action=None,
-        reward=0,
-        termination=False,
-        truncation=False,
+            self,
+            new_observation,
+            action=None,
+            reward=0,
+            termination=False,
+            truncation=False,
     ) -> None:
         if action is None:
             action = self.action_space.sample()
 
-        self.gameplays.append(
-            new_observation, action, reward, termination, truncation
+        self.gameplays.push(
+            new_observation,
+            action,
+            reward,
+            termination,
+            truncation,
         )
 
     def learn(self, batch_size=512) -> float:
@@ -149,21 +120,20 @@ class GeneralQ(Agent):
             next_observations,
         ) = self.gameplays.sample(batch_size)
 
-        action_samples = self.q.action_encoder.sample(
-            self.n_samples
-        )  # [n_samples]
-        action_samples = action_samples[None]  # [1, n_samples]
-        next_qs = self.q(next_observations, action_samples)  # [batch_size, 2]
+        next_observations = self.observation_encoder(next_observations)[:, None]  # [batch_size, 1, emb]
+        _, action_embeddings = self.action_encoder.all()  # [n, emb]
+        next_qs = self.q(next_observations + action_embeddings)  # [batch_size, n]
         best_q = next_qs.max(dim=1).values  # [batch_size]
-
         q_target = best_q * ~terminations + rewards  # [batch_size]
-        actions = actions[:, None]  # [batch_size, 1]
-        qs = self.q(observations, actions).squeeze(1)  # [batch_size, 1]
+
+        observations = self.observation_encoder(observations)  # [batch_size, emb]
+        actions = self.action_encoder(actions)  # [batch_size, emb]
+        qs = self.q(observations + actions)  # [batch_size]
         loss = F.mse_loss(qs, q_target)
 
-        self.optimizer.zero_grad()
+        self.q.optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
+        self.q.optimizer.step()
 
         return loss.item()
 
@@ -186,9 +156,9 @@ class GeneralQ(Agent):
 
     @classmethod
     def load_pretrained(
-        cls,
-        path: Union[str, Path],
-        raise_error: bool = True
+            cls,
+            path: Union[str, Path],
+            raise_error: bool = True
     ) -> Optional["GeneralQ"]:
         """
         Load the model from the given path.
