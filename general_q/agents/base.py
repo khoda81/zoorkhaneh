@@ -7,7 +7,7 @@ from pathlib import Path
 from gym import Space
 from gym.core import ActType, ObsType
 
-NAMES_PATH = Path(__file__).parent / "first-names.txt"
+NAMES_PATH = Path(__file__).parent / "names.txt"
 
 with open(NAMES_PATH) as f:
     NAMES = f.read().splitlines()
