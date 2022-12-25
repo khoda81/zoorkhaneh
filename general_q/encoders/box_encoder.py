@@ -4,10 +4,10 @@ import numpy as np
 from gym import spaces
 from torch import nn
 
-from general_q.encoders.sub import SubEncoder
+from general_q.encoders.tensor_encoder import TensorEncoder
 
 
-class BoxEncoder(SubEncoder):
+class BoxEncoder(TensorEncoder):
     def make_encoder(self, space: spaces.Box, embed_dim=256):
         class Unsqueeze(nn.Module):
             def forward(self, x):

@@ -7,7 +7,7 @@ from gym import spaces
 from torch import nn
 
 from general_q.encoders.base import Encoder, I, T
-from general_q.encoders.sub import SubEncoder, TensorBatch
+from general_q.encoders.tensor_encoder import TensorBatch, TensorEncoder
 
 
 class Discrete(Encoder[T, I], ABC, Generic[T, I]):
@@ -16,7 +16,7 @@ class Discrete(Encoder[T, I], ABC, Generic[T, I]):
         """Make a batch of all possible values of this encoder"""
 
 
-class DiscreteEncoder(SubEncoder[nn.Embedding, int], Discrete[TensorBatch, int]):
+class DiscreteEncoder(TensorEncoder[nn.Embedding, int], Discrete[TensorBatch, int]):
     @staticmethod
     def supports(space: spaces.Space) -> bool:
         return type(space) == spaces.Discrete
@@ -39,7 +39,7 @@ class DiscreteEncoder(SubEncoder[nn.Embedding, int], Discrete[TensorBatch, int])
         return sample.data.item()
 
 
-class MultiDiscreteEncoder(SubEncoder[nn.ModuleList, I]):
+class MultiDiscreteEncoder(TensorEncoder[nn.ModuleList, I]):
     @staticmethod
     def supports(space) -> bool:
         return type(space) == spaces.MultiDiscrete
@@ -61,7 +61,7 @@ class MultiDiscreteEncoder(SubEncoder[nn.ModuleList, I]):
         )
 
 
-class MultiBinaryEncoder(SubEncoder):
+class MultiBinaryEncoder(TensorEncoder):
     @staticmethod
     def supports(space: spaces.Space) -> bool:
         return type(space) == spaces.MultiBinary

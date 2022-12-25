@@ -3,10 +3,10 @@ import torch
 from gym import spaces
 from torch import nn
 
-from general_q.encoders.sub import SubEncoder
+from general_q.encoders.tensor_encoder import TensorEncoder
 
 
-class ByteImageEncoder(SubEncoder):
+class ImageEncoder(TensorEncoder):
     def make_encoder(self, space, embed_dim):
         self.encoder = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3),

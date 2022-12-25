@@ -158,7 +158,7 @@ class GeneralQ(Agent, nn.Module):
     def load_pretrained(
             cls,
             path: Union[str, Path],
-            raise_error: bool = True
+            raise_error: bool = True,
     ) -> Optional["GeneralQ"]:
         """
         Load the model from the given path.

@@ -24,7 +24,7 @@ class TensorBatch(Batch[torch.Tensor, I], Generic[I]):
 M = TypeVar("M", bound=torch.nn.Module)
 
 
-class SubEncoder(Encoder[TensorBatch, I], ABC, Generic[M, I]):
+class TensorEncoder(Encoder[TensorBatch, I], ABC, Generic[M, I]):
     def __init__(self, space: spaces.Space[I], embed_dim: int):
         super().__init__(space)
         self.dtype = torch.tensor(space.sample()).dtype

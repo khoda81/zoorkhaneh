@@ -9,6 +9,9 @@ from gym.core import ActType, ObsType
 
 NAMES_PATH = Path(__file__).parent / "first-names.txt"
 
+with open(NAMES_PATH) as f:
+    NAMES = f.read().splitlines()
+
 
 class Agent(ABC):
     def __init__(
@@ -26,10 +29,7 @@ class Agent(ABC):
             name: The name of the agent.
         """
         if name is None:
-            with open(NAMES_PATH) as f:
-                names = f.read().splitlines()
-
-            name = random.choice(names)
+            name = random.choice(NAMES)
 
         self.action_space = action_space
         self.observation_space = observation_space
