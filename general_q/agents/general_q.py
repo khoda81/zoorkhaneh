@@ -1,7 +1,4 @@
-from typing import Optional, Union
-
-import pickle
-from pathlib import Path
+from typing import Optional
 
 import torch
 from gymnasium.core import ActType, ObsType
@@ -37,9 +34,9 @@ class GeneralQ(Agent, nn.Module):
     ) -> None:
         super().__init__(action_space, observation_space, name)
 
-        self.device = device
-        if q is None:
-            q = nn.Sequential(
+        self.q = q
+        if self.q is None:
+            self.q = nn.Sequential(
                 nn.Linear(embed_dim, embed_dim),
                 nn.GELU(),
                 nn.Linear(embed_dim, embed_dim),
@@ -52,17 +49,14 @@ class GeneralQ(Agent, nn.Module):
                 nn.Flatten(-2),
             )
 
-            q.optimizer = optim.Adam(q.parameters(), lr=lr)
-
-        self.q = q
-
         self.action_encoder = action_encoder(action_space, embed_dim)
         assert isinstance(self.action_encoder, Encoder), f"{self.action_encoder} should inherit from {Encoder}"
 
         self.observation_encoder = observation_encoder(observation_space, embed_dim)
         assert isinstance(self.observation_encoder, Encoder), f"{self.observation_encoder} should inherit from {Encoder}"
 
-        self.to(self.device)
+        self.optimizer = optim.Adam(self.parameters(), lr=lr)
+        self.to(device)
 
         self.gameplays = ReplayMemory(
             action_encoder=self.action_encoder,
@@ -115,7 +109,7 @@ class GeneralQ(Agent, nn.Module):
         Learn from the gameplays.
 
         Args:
-            batch_size: The number of gameplays to learn from.
+            batch_size: The number of gameplay steps to learn from.
 
         Returns:
             The loss value.
@@ -145,9 +139,9 @@ class GeneralQ(Agent, nn.Module):
         qs = self.q(observations + actions)  # [batch_size]
         loss = F.mse_loss(qs, q_target)
 
-        self.q.optimizer.zero_grad()
+        self.optimizer.zero_grad()
         loss.backward()
-        self.q.optimizer.step()
+        self.optimizer.step()
 
         return loss.item()
 

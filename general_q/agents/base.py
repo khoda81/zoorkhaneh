@@ -91,7 +91,6 @@ class Agent(ABC):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.reset()
-        return False
 
     def __call__(self, obs: ObsType) -> ActType:
         """Call agent.act()"""

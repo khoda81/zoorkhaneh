@@ -9,21 +9,13 @@ class ReplayMemory:
             observation_encoder: Encoder,
             action_encoder: Encoder,
             capacity: int,
-            device: torch.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            ),
+            device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     ):
         self.observations = observation_encoder.sample(capacity)
         self.actions = action_encoder.sample(capacity)
-        self.rewards = torch.zeros(
-            (capacity,), dtype=torch.float32, device=device
-        )
-        self.terminations = torch.ones(
-            (capacity,), dtype=torch.bool, device=device
-        )
-        self.truncations = torch.ones(
-            (capacity,), dtype=torch.bool, device=device
-        )
+        self.rewards = torch.zeros((capacity,), dtype=torch.float32, device=device)
+        self.terminations = torch.ones((capacity,), dtype=torch.bool, device=device)
+        self.truncations = torch.ones((capacity,), dtype=torch.bool, device=device)
 
         self.capacity = capacity
         self.last = capacity - 1
@@ -37,12 +29,11 @@ class ReplayMemory:
             termination=False,
             truncation=False,
     ) -> None:
-        # TODO profile append
+        # TODO profile push
         self.last = (self.last + 1) % self.capacity
 
-        self.observations[self.last] = self.observations.encoder.prepare(
-            new_observation
-        )
+        self.observations[self.last] = \
+            self.observations.encoder.prepare(new_observation)
         self.actions[self.last] = self.actions.encoder.prepare(action)
         self.rewards[self.last] = reward
         self.terminations[self.last] = termination
@@ -59,7 +50,7 @@ class ReplayMemory:
 
     def sample(self, batch_size: int):
         indices = self.valid_indices()
-        indices = indices[torch.randperm(len(indices))]
+        indices = indices[torch.randperm(len(indices))]  # randomize indices
         indices = indices[:batch_size]
 
         return self[indices]
@@ -72,7 +63,8 @@ class ReplayMemory:
 
     def __getitem__(self, item):
         # convert slices to indices
-        next_item = (torch.arange(self.size)[item] + 1) % self.capacity
+        item = torch.arange(self.size)[item]
+        next_item = (item + 1) % self.capacity
 
         obs = self.observations[item]
         action = self.actions[next_item]
