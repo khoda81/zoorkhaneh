@@ -1,7 +1,8 @@
 # type: ignore[attr-defined]
 """An easy to use library for general purpose reinforcement learning and experimentation"""
 
-# from . import agents, encoders, utils
+from . import agents, encoders, utils
+
 
 def get_version() -> str:
     from importlib import metadata as importlib_metadata
@@ -12,5 +13,4 @@ def get_version() -> str:
         return "unknown"
 
 
-__version__ = version: str = get_version()
-# __all__ = ["agents", "encoders", "utils"]
+__version__: str = get_version()

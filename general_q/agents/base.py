@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, Union
 
+import pickle
 import random
 from abc import ABC
 from pathlib import Path
@@ -28,6 +29,8 @@ class Agent(ABC):
             observation_space: The observation space of the environment.
             name: The name of the agent.
         """
+        super().__init__()
+
         if name is None:
             name = random.choice(NAMES)
 
@@ -96,3 +99,38 @@ class Agent(ABC):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(name={self.name!r})'
+
+    def save_pretrained(self, path: Union[str, Path]):
+        """
+        Save the agent to the given path.
+
+        Args:
+            path: The path to save the agent to.
+        """
+
+        path = Path(path) / f"{self.name}.{self.__class__.__name__}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load_pretrained(
+            path: Union[str, Path],
+            raise_error: bool = True,
+    ) -> Optional["Agent"]:
+        """
+        Load the agent from the given path.
+
+        Args:
+            path: The path to load the agent from.
+            raise_error: Whether to raise an error if the agent could not be loaded.
+
+        Returns:
+            The loaded agent or None if the agent could not be loaded.
+        """
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
+            if raise_error:
+                raise

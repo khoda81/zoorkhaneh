@@ -14,6 +14,11 @@ from general_q.agents.replay_memory import ReplayMemory
 from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
 
+class InvalidMemoryState(Exception):
+    pass
+
+
+
 class GeneralQ(Agent, nn.Module):
     def __init__(
             self,
@@ -30,8 +35,7 @@ class GeneralQ(Agent, nn.Module):
             lr: float = 1e-3,
             replay_memory_size: int = 4096,
     ) -> None:
-        Agent.__init__(self, action_space, observation_space, name)
-        nn.Module.__init__(self)
+        super().__init__(action_space, observation_space, name)
 
         self.device = device
         if q is None:
@@ -88,6 +92,15 @@ class GeneralQ(Agent, nn.Module):
     ) -> None:
         if action is None:
             action = self.action_space.sample()
+            if self.gameplays.size != 0:
+                _, _, _, term, trunc, _ = self.gameplays[self.gameplays.last]
+                state = "terminal" if term else "truncated" if trunc else ""
+
+                if state:
+                    raise InvalidMemoryState(
+                        f"The last memory state was {state}, but no action was provided. "
+                        f"Did you forget to call `agent.reset()` before `agent.remember(obs)`?"
+                    )
 
         self.gameplays.push(
             new_observation,
@@ -117,6 +130,7 @@ class GeneralQ(Agent, nn.Module):
             actions,
             rewards,
             terminations,
+            _truncations,
             next_observations,
         ) = self.gameplays.sample(batch_size)
 
@@ -138,41 +152,4 @@ class GeneralQ(Agent, nn.Module):
         return loss.item()
 
     def reset(self):
-        # set the last transition to invalid
         self.gameplays.close()
-
-    def save_pretrained(self, path: Union[str, Path]):
-        """
-        Save the model to the given path.
-
-        Args:
-            path: The path to save the model to.
-        """
-
-        path = Path(path) / f"{self.name}.{self.__class__.__name__}"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(self, f)
-
-    @classmethod
-    def load_pretrained(
-            cls,
-            path: Union[str, Path],
-            raise_error: bool = True,
-    ) -> Optional["GeneralQ"]:
-        """
-        Load the model from the given path.
-
-        Args:
-            path: The path to load the model from.
-            raise_error: Whether to raise an error if the model could not be loaded.
-
-        Returns:
-            The loaded model or None if the model could not be loaded.
-        """
-        try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
-        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
-            if raise_error:
-                raise

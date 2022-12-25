@@ -77,7 +77,8 @@ class ReplayMemory:
         obs = self.observations[item]
         action = self.actions[next_item]
         reward = self.rewards[next_item]
-        terminate = self.terminations[next_item]
+        terminations = self.terminations[next_item]
+        truncations = self.truncations[next_item]
         new_obs = self.observations[next_item]
 
-        return obs, action, reward, terminate, new_obs
+        return obs, action, reward, terminations, truncations, new_obs

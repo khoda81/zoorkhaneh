@@ -12,7 +12,7 @@ SAVE_PATH = Path("tmp/pretrained/")
 
 
 def train(wandb_project="general-q") -> None:
-    # env = gymnasium.make("CartPole-v1", render_mode="human")
+    env = gymnasium.make("CartPole-v1", render_mode="human")
     # env = gymnasium.wrappers.TransformReward(
     #     gymnasium.make("LunarLander-v2", render_mode="human"), lambda r: 0.01 * r
     # )
@@ -71,7 +71,7 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
     if not path.exists():
         return None
 
-    best = -float("inf"), None
+    best_time, best_agent = -float("inf"), None
     for path in path.iterdir():
         agent = GeneralQ.load_pretrained(path, raise_error=False)
         if agent is None:
@@ -80,11 +80,11 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
         if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
             continue
 
-        candidate = path.stat().st_mtime, agent
-        best = max(best, candidate)
+        modify_time = path.stat().st_mtime
+        if modify_time > best_time:
+            best_time, best_agent = modify_time, agent
 
-    time, agent = best
-    return agent
+    return best_agent
 
 
 def create_agent(env: gymnasium.Env) -> Agent:
