@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-from gym import spaces
+from gymnasium import spaces
 
 from general_q.encoders.base import Batch, Encoder, I
 

@@ -1,7 +1,16 @@
-from importlib.metadata import version
+# type: ignore[attr-defined]
+"""An easy to use library for general purpose reinforcement learning and experimentation"""
 
-__version__ = version("general_q")
+# from . import agents, encoders, utils
 
-from . import agents, encoders, utils
+def get_version() -> str:
+    from importlib import metadata as importlib_metadata
 
-__all__ = ["agents", "encoders", "utils"]
+    try:
+        return importlib_metadata.version(__name__)
+    except importlib_metadata.PackageNotFoundError:  # pragma: no cover
+        return "unknown"
+
+
+__version__ = version: str = get_version()
+# __all__ = ["agents", "encoders", "utils"]

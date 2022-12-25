@@ -4,8 +4,8 @@ import pickle
 from pathlib import Path
 
 import torch
-from gym.core import ActType, ObsType
-from gym.spaces import Space
+from gymnasium.core import ActType, ObsType
+from gymnasium.spaces import Space
 from torch import nn, optim
 from torch.nn import functional as F
 

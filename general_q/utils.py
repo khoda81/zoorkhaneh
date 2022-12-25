@@ -1,6 +1,6 @@
 from itertools import count
 
-from gym import Env
+from gymnasium import Env
 from tqdm import tqdm, trange
 
 from general_q.agents import Agent

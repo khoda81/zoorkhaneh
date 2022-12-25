@@ -4,8 +4,8 @@ import random
 from abc import ABC
 from pathlib import Path
 
-from gym import Space
-from gym.core import ActType, ObsType
+from gymnasium import Space
+from gymnasium.core import ActType, ObsType
 
 NAMES_PATH = Path(__file__).parent / "names.txt"
 

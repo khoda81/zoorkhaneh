@@ -3,7 +3,7 @@ from typing import Generic
 from abc import ABC, abstractmethod
 
 import torch
-from gym import spaces
+from gymnasium import spaces
 from torch import nn
 
 from general_q.encoders.base import Encoder, I, T

@@ -2,7 +2,7 @@ from typing import Optional
 
 from pathlib import Path
 
-import gym
+import gymnasium
 import wandb
 
 from general_q.agents import Agent, GeneralQ
@@ -12,19 +12,19 @@ SAVE_PATH = Path("tmp/pretrained/")
 
 
 def train(wandb_project="general-q") -> None:
-    # env = gym.make("CartPole-v1", render_mode="human")
-    # env = gym.wrappers.TransformReward(
-    #     gym.make("LunarLander-v2", render_mode="human"), lambda r: 0.01 * r
+    # env = gymnasium.make("CartPole-v1", render_mode="human")
+    # env = gymnasium.wrappers.TransformReward(
+    #     gymnasium.make("LunarLander-v2", render_mode="human"), lambda r: 0.01 * r
     # )
-    # env = gym.make("Acrobot-v1", render_mode="human")
-    # env = gym.wrappers.TransformReward(gym.make('Pendulum-v1', render_mode="human"), lambda r: 0.1 * r)
-    # env = gym.make("MountainCarContinuous-v0", render_mode="human")
-    # env = gym.make('CliffWalking-v0')
-    # env = gym.make('CliffWalking-v0', render_mode="human")
-    # env = gym.make("CarRacing-v2", render_mode="human")
-    # env = gym.wrappers.TimeLimit(gym.make("CarRacing-v2", render_mode="human"), max_episode_steps=100)
-    # env = gym.make("BipedalWalker-v3", render_mode="human")
-    # env = gym.make("Blackjack-v1", render_mode="human")
+    # env = gymnasium.make("Acrobot-v1", render_mode="human")
+    # env = gymnasium.wrappers.TransformReward(gymnasium.make('Pendulum-v1', render_mode="human"), lambda r: 0.1 * r)
+    # env = gymnasium.make("MountainCarContinuous-v0", render_mode="human")
+    # env = gymnasium.make('CliffWalking-v0')
+    # env = gymnasium.make('CliffWalking-v0', render_mode="human")
+    # env = gymnasium.make("CarRacing-v2", render_mode="human")
+    # env = gymnasium.wrappers.TimeLimit(gymnasium.make("CarRacing-v2", render_mode="human"), max_episode_steps=100)
+    # env = gymnasium.make("BipedalWalker-v3", render_mode="human")
+    # env = gymnasium.make("Blackjack-v1", render_mode="human")
 
     agent = load_agent(SAVE_PATH, env) or create_agent(env)
 
@@ -65,7 +65,7 @@ def train(wandb_project="general-q") -> None:
     agent.save_pretrained(SAVE_PATH)
 
 
-def load_agent(path, env: gym.Env) -> Optional[Agent]:
+def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
     path = Path(path)
 
     if not path.exists():
@@ -87,7 +87,7 @@ def load_agent(path, env: gym.Env) -> Optional[Agent]:
     return agent
 
 
-def create_agent(env: gym.Env) -> Agent:
+def create_agent(env: gymnasium.Env) -> Agent:
     return GeneralQ(
         env.action_space,
         env.observation_space,

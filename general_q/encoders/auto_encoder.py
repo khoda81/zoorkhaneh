@@ -1,6 +1,6 @@
 from typing import Callable
 
-from gym import spaces
+from gymnasium import spaces
 
 from general_q.encoders.base import Encoder, I, T
 from general_q.encoders.box_encoder import BoxEncoder
@@ -34,7 +34,7 @@ def auto_encoder(space: spaces.Space[I], embed_dim: int, *args, **kwargs) -> Enc
 
 
 def main():
-    from gym.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete
+    from gymnasium.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete
 
     space = Dict(
         {

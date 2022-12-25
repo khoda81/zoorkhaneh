@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from gym import spaces
+from gymnasium import spaces
 from torch import nn
 
 from general_q.encoders.tensor_encoder import TensorEncoder

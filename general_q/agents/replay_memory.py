@@ -51,10 +51,11 @@ class ReplayMemory:
         self.size = min(self.size + 1, self.capacity)
 
     def valid_indices(self):
-        valid = ~self.terminations & ~self.truncations
-        valid[self.last] = False
+        is_valid = ~self.terminations & ~self.truncations
+        is_valid[self.last] = False
 
-        return torch.where(valid)[0]
+        indices, = torch.where(is_valid)
+        return indices
 
     def sample(self, batch_size: int):
         indices = self.valid_indices()

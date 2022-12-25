@@ -1,7 +1,8 @@
 from collections import OrderedDict
+from shutil import ExecError
 
 import torch
-from gym import spaces
+from gymnasium import spaces
 from torch import nn
 
 from general_q.encoders.base import Batch, Encoder
@@ -66,6 +67,10 @@ class DictEncoder(Encoder, nn.ModuleDict):
             for key, encoder in self.items()
         )
 
+    def atomic_encoders(self):
+        for key, encoder in self.items():
+            for sub_key, sub_encoder in encoder.atomic_encoders():
+                yield (key, *sub_key), sub_encoder
 
 class TupleEncoder(DictEncoder):
     def __init__(self, space: spaces.Tuple, embed_dim=256):

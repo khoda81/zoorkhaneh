@@ -3,7 +3,7 @@ from typing import Callable, Generic, TypeVar
 from abc import ABC, abstractmethod
 
 import torch
-from gym import spaces
+from gymnasium import spaces
 from torch import nn
 
 T = TypeVar("T")
@@ -69,3 +69,6 @@ class Encoder(nn.Module, ABC, Generic[T, I]):
     @abstractmethod
     def item(self, x):
         """Convert a tensor to a sample."""
+    
+    def atomic_encoders(self):
+        yield (), self
