@@ -1,88 +1,130 @@
+from typing import Callable
+
+import functools
+import operator
 from collections import OrderedDict
-from shutil import ExecError
 
 import torch
 from gymnasium import spaces
 from torch import nn
 
-from general_q.encoders.base import Batch, Encoder
+from general_q.encoders.base import Batched, Encoder
 
 
-class MultiBatch(Batch[OrderedDict, OrderedDict]):
-    @classmethod
-    def from_dict(cls, data: OrderedDict, encoder, func=lambda x: x):
-        return cls(
-            OrderedDict(
-                (key, func(value))
-                for key, value in data.items()
-            ),
-            encoder
-        )
+def dzip(*mappings):
+    keys = functools.reduce(
+        operator.and_,
+        (mapping.keys() for mapping in mappings),
+    )
 
-    def __getitem__(self, item):
-        return OrderedDict(
-            (k, v[item])
-            for k, v in self.data.items()
-        )
+    for k in keys:
+        yield k, tuple(mapping[k] for mapping in mappings)
 
-    def __setitem__(self, key, value):
-        for k, v in value.items():
-            self._data[k][key] = v
+
+class BatchedMap(OrderedDict[str, Batched], Batched):
+    def batched_getitem(self, item):
+        return self.map(lambda v: v.batched_getitem(item))
+
+    def batched_setitem(self, item, value: Batched):
+        self.dzip(value).map(lambda v: v[0].batched_setitem(item, v[1]))
+
+    def apply(self, func: Callable[[Batched], Batched]) -> Batched:
+        return self.__class__({k: v.apply(func) for k, v in self.items()})
+
+    def map(self, func: Callable[[Batched], Batched]) -> Batched:
+        return self.__class__({k: func(v) for k, v in self.items()})
+
+    def dzip(self, *mappings):
+        return self.__class__(dzip(self, *mappings))
+
+    def __repr__(self):
+        return super(OrderedDict, self).__repr__()
 
 
 class DictEncoder(Encoder, nn.ModuleDict):
-    def __init__(self, space: spaces.Dict, subencoder=lambda: None, embed_dim=256):
-        super().__init__(space)
-        for key, subspace in space.spaces.items():
-            encoder = subencoder(subspace, name=key, embed_dim=embed_dim)
-
+    def __init__(
+            self,
+            space: spaces.Dict,
+            subencoder,
+            embed_dim=256,
+            *args, **kwargs,
+    ):
+        super().__init__(space, *args, **kwargs)
+        for key, subspace in space.items():
+            encoder = subencoder(space=subspace, embed_dim=embed_dim, *args, **kwargs)
             assert isinstance(encoder, Encoder), f"{encoder} should inherit from {Encoder}"
             self[key] = encoder
+
+    @property
+    def batched(self):
+        return BatchedMap(self)
 
     @staticmethod
     def supports(space: spaces.Space) -> bool:
         return isinstance(space, spaces.Dict)
 
-    def prepare(self, sample):
-        return MultiBatch(
-            OrderedDict(
-                (key, encoder.prepare(sample[key]))
-                for key, encoder in self.items()
-            ),
-            self
-        )
+    def prepare(self, sample: dict):
+        return self.batched.dzip(sample).map(lambda e, s: e.prepare(s))
 
-    def sample(self, batch_size=1):
-        return MultiBatch.from_dict(self, self, lambda encoder: encoder.sample(batch_size))
+    def sample(self, *args, **kwargs):
+        return BatchedMap(self).map(lambda e: e.sample(*args, **kwargs))
 
-    def forward(self, x):
-        return torch.sum(
-            torch.stack([encoder(x.data[key]) for key, encoder in self.items()], dim=-1),
-            dim=-1,
-        )
+    def forward(self, sample):
+        encoded = [e(s) for _, (e, s) in dzip(self, sample)]
+        return torch.cat(encoded, dim=-2)
 
     def item(self, sample):
-        return OrderedDict(
-            (key, encoder.item(sample.data[key]))
-            for key, encoder in self.items()
+        return OrderedDict((k, e.item(s)) for k, (e, s) in dzip(self, sample))
+
+
+class BatchedTuple(tuple, Batched):
+    def batched_getitem(self, item):
+        return self.map(lambda v: v.batched_getitem(item))
+
+    def batched_setitem(self, item, value: Batched):
+        for v1, v2 in zip(self, value):
+            v1.batched_setitem(item, v2)
+
+    def apply(self, func: Callable[[Batched], Batched]) -> Batched:
+        return self.__class__(v.apply(func) for v in self)
+
+    def map(self, func: Callable[[Batched], Batched]) -> Batched:
+        return self.__class__(func(v) for v in self)
+
+    def zip(self, *iters):
+        return self.__class__(zip(self, *iters))
+
+
+class TupleEncoder(Encoder, nn.ModuleList):
+    def __init__(
+            self,
+            space: spaces.Tuple,
+            subencoder,
+            embed_dim=256,
+            *args, **kwargs,
+    ):
+        super().__init__(
+            space,
+            modules=(
+                subencoder(space=space, embed_dim=embed_dim, *args, **kwargs)
+                for space in space.spaces
+            ),
+            *args, **kwargs,
         )
-
-    def atomic_encoders(self):
-        for key, encoder in self.items():
-            for sub_key, sub_encoder in encoder.atomic_encoders():
-                yield (key, *sub_key), sub_encoder
-
-class TupleEncoder(DictEncoder):
-    def __init__(self, space: spaces.Tuple, embed_dim=256):
-        space = spaces.Dict(enumerate(space.spaces))
-        super().__init__(space, embed_dim)
 
     @staticmethod
     def supports(space: spaces.Space) -> bool:
         return isinstance(space, spaces.Tuple)
 
-    def prepare(self, sample):
-        return super().prepare(OrderedDict(enumerate(sample)))
+    def prepare(self, sample: BatchedTuple):
+        return tuple(e.prepare(s) for e, s in zip(self, sample))
+
+    def sample(self, *args, **kwargs):
+        return BatchedTuple(e.sample(*args, **kwargs) for e in self)
+
+    def forward(self, sample):
+        encoded = [e(s) for e, s in zip(self, sample)]
+        return torch.cat(encoded, dim=-2)
 
     def item(self, sample):
-        return tuple(super().item(sample).values())
+        return tuple(e.item(s) for e, s in zip(self, sample))

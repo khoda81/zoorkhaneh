@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import torch
 from gymnasium import spaces
 from torch import nn
 
@@ -8,20 +9,8 @@ from general_q.encoders.tensor_encoder import TensorEncoder
 
 
 class BoxEncoder(TensorEncoder):
-    def make_encoder(self, space: spaces.Box, embed_dim=256):
-        class Unsqueeze(nn.Module):
-            def forward(self, x):
-                return x.unsqueeze(-1)
-
-        preprocess_layer = (
-            Unsqueeze()
-            if space.shape == ()
-            else nn.Flatten(start_dim=-len(space.shape))
-        )
-        return nn.Sequential(
-            preprocess_layer,
-            nn.Linear(math.prod(space.shape), embed_dim),
-        )
+    def make_encoder(self, embed_dim=256):
+        return nn.Linear(math.prod(self.space.shape), embed_dim)
 
     @classmethod
     def supports(cls, space: spaces.Space) -> bool:
@@ -30,3 +19,15 @@ class BoxEncoder(TensorEncoder):
             np.float32,
             np.float64,
         ]
+
+    def prepare(self, sample):
+        def _prepare(sample: torch.Tensor) -> torch.Tensor:
+            batch_shape = sample.shape[:len(sample.shape) - len(self.space.shape)]
+            return sample.reshape(batch_shape + (-1,))
+
+        return super().prepare(sample).apply(_prepare)
+
+    def item(self, sample: torch.Tensor):
+        *batch_shape, _ = sample.shape
+        new_shape = (*batch_shape, *self.space.shape)
+        return sample.reshape(new_shape).cpu().numpy()

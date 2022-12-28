@@ -46,13 +46,13 @@ class Agent(ABC):
             obs (np.ndarray): Observation from the environment.
 
         Returns:
-            The action to take and the value of the action.
+            The action to take and the expected value of the action.
         """
         return self.action_space.sample(), 0.0
 
     def reset(self) -> None:
         """
-        Reset the state of the agent. And get ready for next episode.
+        Reset the state of the agent and get ready for next episode.
         """
 
     def remember(
@@ -64,7 +64,8 @@ class Agent(ABC):
             truncation: bool = False,
     ) -> None:
         """
-        Remember the action taken.
+        Remember the action and the consequences. Data stored by this method should only be used for learning.
+        Agent state should be stored in the agent as attributes and managed by `agent.act` and `agent.reset`.
 
         Args:
             new_observation: The observation after the action.

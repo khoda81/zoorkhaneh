@@ -4,7 +4,7 @@ PYTHON := python
 PYTHONPATH := `pwd`
 
 #* Docker variables
-IMAGE := general_q
+IMAGE := general-q
 VERSION := latest
 
 #* Installation
@@ -13,7 +13,7 @@ install:
 	poetry lock -n
 	poetry export --without-hashes > requirements.txt
 	poetry install -n
-	-poetry run mypy --install-types --non-interactive ./
+	poetry run mypy --install-types --non-interactive ./
 
 .PHONY: publish
 publish:

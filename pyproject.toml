@@ -131,7 +131,7 @@ addopts = [
 source = ["tests"]
 
 [coverage.paths]
-source = "general-q"
+source = "general_q"
 
 [coverage.run]
 branch = true

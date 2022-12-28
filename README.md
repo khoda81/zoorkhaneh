@@ -2,8 +2,8 @@
 
 <div align="center">
 
-[![Build status](https://github.com/khoda81/general-q/workflows/build/badge.svg?branch=master&event=push)](https://github.com/khoda81/general-q/actions?query=workflow%3Abuild)
-[![Python Version](https://img.shields.io/pypi/pyversions/general-q.svg)](https://pypi.org/project/general-q/)S
+[![Build status](https://github.com/khoda81/general-q/workflows/build/badge.svg?branch=master&event=push)](https://github.com/khoda81/general-q/workflows/build/badge.svg?branch=master&event=push)
+[![Python Version](https://img.shields.io/pypi/pyversions/general-q.svg)](https://pypi.org/project/general-q/)
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)

@@ -3,15 +3,21 @@ from typing import Optional
 from pathlib import Path
 
 import gymnasium
+import lovely_tensors as lt
+import torch
 import wandb
 
 from general_q.agents import Agent, GeneralQ
 from general_q.utils import play
 
+lt.monkey_patch()
+lt.set_config(precision=4, sci_mode=False)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 SAVE_PATH = Path("tmp/pretrained/")
 
 
-def train(wandb_project="general-q") -> None:
+def train(wandb_project="general_q") -> None:
     env = gymnasium.make("CartPole-v1", render_mode="human")
     # env = gymnasium.wrappers.TransformReward(
     #     gymnasium.make("LunarLander-v2", render_mode="human"), lambda r: 0.01 * r
