@@ -14,7 +14,7 @@ with open(NAMES_PATH) as f:
     NAMES = f.read().splitlines()
 
 
-class Agent(ABC):
+class Agent(ABC):  # TODO maybe inherit from nn.Module
     def __init__(
             self,
             action_space: Space[ActType],
@@ -38,7 +38,7 @@ class Agent(ABC):
         self.observation_space = observation_space
         self.name = name
 
-    def act(self, obs: ObsType) -> tuple[ActType, float]:
+    def act(self, obs: ObsType) -> ActType:
         """
         Act based on the observation.
 
@@ -46,9 +46,9 @@ class Agent(ABC):
             obs (np.ndarray): Observation from the environment.
 
         Returns:
-            The action to take and the expected value of the action.
+            The action to take.
         """
-        return self.action_space.sample(), 0.0
+        return self.action_space.sample()
 
     def reset(self) -> None:
         """
@@ -84,9 +84,6 @@ class Agent(ABC):
         """
         return 0.0
 
-    def close(self) -> None:
-        """Close the agent."""
-
     def __enter__(self):
         return self
 
@@ -110,6 +107,7 @@ class Agent(ABC):
 
         path = Path(path) / f"{self.name}.{self.__class__.__name__}"
         path.parent.mkdir(parents=True, exist_ok=True)
+
         with open(path, "wb") as f:
             pickle.dump(self, f)
 

@@ -14,14 +14,20 @@ lt.monkey_patch()
 lt.set_config(precision=4, sci_mode=False)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-SAVE_PATH = Path("tmp/pretrained/")
+SAVE_PATH = Path("tmp/pretrained")
 
 
 def train(wandb_project="general_q") -> None:
-    env = gymnasium.make("CartPole-v1", render_mode="human")
-    # env = gymnasium.wrappers.TransformReward(
-    #     gymnasium.make("LunarLander-v2", render_mode="human"), lambda r: 0.01 * r
-    # )
+    # env = gymnasium.make("CartPole-v1", render_mode="human")
+    env = gymnasium.wrappers.TransformReward(
+        gymnasium.make(
+            "LunarLander-v2",
+            render_mode="human",
+        ),
+        # lambda r: 1e-0 * r,
+        # lambda r: 1e-1 * r,
+        lambda r: 1e-2 * r,
+    )
     # env = gymnasium.make("Acrobot-v1", render_mode="human")
     # env = gymnasium.wrappers.TransformReward(gymnasium.make('Pendulum-v1', render_mode="human"), lambda r: 0.1 * r)
     # env = gymnasium.make("MountainCarContinuous-v0", render_mode="human")
@@ -30,7 +36,10 @@ def train(wandb_project="general_q") -> None:
     # env = gymnasium.make("CarRacing-v2", render_mode="human")
     # env = gymnasium.wrappers.TimeLimit(gymnasium.make("CarRacing-v2", render_mode="human"), max_episode_steps=100)
     # env = gymnasium.make("BipedalWalker-v3", render_mode="human")
-    # env = gymnasium.make("Blackjack-v1", render_mode="human")
+    # env = gymnasium.make(
+    #     "Blackjack-v1",
+    #     # render_mode="human",
+    # )
 
     agent = load_agent(SAVE_PATH, env) or create_agent(env)
 
@@ -52,17 +61,18 @@ def train(wandb_project="general_q") -> None:
             }
         )
 
+    # wandb.login(relogin=True)
     wandb.init(
         project=wandb_project,
         dir=SAVE_PATH.parent,
-        name=str(agent)
+        name=str(agent),
     )
 
     with env, agent:
         play(
             env,
             agent,
-            40000,
+            200000,
             train=True,
             step_callback=save_agent,
             episode_callback=log_to_wandb,

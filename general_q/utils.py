@@ -48,7 +48,7 @@ def play(
             eps_loss = 0
             with tqdm(count(1), leave=False, total=max_step) as episode_pbar:
                 for episode_step in episode_pbar:
-                    action, value = agent(observation)
+                    action = agent(observation)
                     (
                         observation,
                         reward,
@@ -82,7 +82,7 @@ def play(
                         description += f"{loss=:6.3f}, "
                         eps_loss += loss
 
-                    description += f"{reward=:6.2f}, {tot_rew=:6.2f}, {value=:6.2f}"
+                    description += f"{reward=:6.2f}, {tot_rew=:6.2f}"
                     episode_pbar.set_description(description)
                     step_pbar.update()
 

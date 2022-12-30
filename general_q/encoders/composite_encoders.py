@@ -1,47 +1,14 @@
-from typing import Callable
-
-import functools
-import operator
-from collections import OrderedDict
-
 import torch
 from gymnasium import spaces
 from torch import nn
 
-from general_q.encoders.base import Batched, Encoder
-
-
-def dzip(*mappings):
-    keys = functools.reduce(
-        operator.and_,
-        (mapping.keys() for mapping in mappings),
-    )
-
-    for k in keys:
-        yield k, tuple(mapping[k] for mapping in mappings)
-
-
-class BatchedMap(OrderedDict[str, Batched], Batched):
-    def batched_getitem(self, item):
-        return self.map(lambda v: v.batched_getitem(item))
-
-    def batched_setitem(self, item, value: Batched):
-        self.dzip(value).map(lambda v: v[0].batched_setitem(item, v[1]))
-
-    def apply(self, func: Callable[[Batched], Batched]) -> Batched:
-        return self.__class__({k: v.apply(func) for k, v in self.items()})
-
-    def map(self, func: Callable[[Batched], Batched]) -> Batched:
-        return self.__class__({k: func(v) for k, v in self.items()})
-
-    def dzip(self, *mappings):
-        return self.__class__(dzip(self, *mappings))
-
-    def __repr__(self):
-        return super(OrderedDict, self).__repr__()
+from general_q.encoders.base import Encoder
+from general_q.encoders.storage import MapStorage, TupleStorage, dzip
 
 
 class DictEncoder(Encoder, nn.ModuleDict):
+    space: spaces.Dict
+
     def __init__(
             self,
             space: spaces.Dict,
@@ -51,51 +18,43 @@ class DictEncoder(Encoder, nn.ModuleDict):
     ):
         super().__init__(space, *args, **kwargs)
         for key, subspace in space.items():
-            encoder = subencoder(space=subspace, embed_dim=embed_dim, *args, **kwargs)
-            assert isinstance(encoder, Encoder), f"{encoder} should inherit from {Encoder}"
+            encoder = subencoder(
+                space=subspace,
+                embed_dim=embed_dim,
+                *args, **kwargs
+            )
+
+            assert isinstance(encoder, Encoder), \
+                f"{encoder} should inherit from {Encoder}"
+
             self[key] = encoder
 
-    @property
-    def batched(self):
-        return BatchedMap(self)
+    def prepare(self, sample: dict, *args, **kwargs):
+        return MapStorage(
+            (k, e.prepare(s, *args, **kwargs))
+            for k, (e, s) in dzip(self, sample)
+        )
 
-    @staticmethod
-    def supports(space: spaces.Space) -> bool:
-        return isinstance(space, spaces.Dict)
+    def unprepare(self, sample: MapStorage, *args, **kwargs):
+        return {
+            k: e.item(s, *args, **kwargs)
+            for k, (e, s) in dzip(self, sample.map)
+        }
 
-    def prepare(self, sample: dict):
-        return self.batched.dzip(sample).map(lambda e, s: e.prepare(s))
+    def sample(self, *args, **kwargs) -> MapStorage:
+        return MapStorage(
+            (k, e.sample(*args, **kwargs))
+            for k, e in self.items()
+        )
 
-    def sample(self, *args, **kwargs):
-        return BatchedMap(self).map(lambda e: e.sample(*args, **kwargs))
-
-    def forward(self, sample):
-        encoded = [e(s) for _, (e, s) in dzip(self, sample)]
+    def forward(self, sample: MapStorage):
+        encoded = [e(s) for _, (e, s) in dzip(self, sample.map)]
         return torch.cat(encoded, dim=-2)
-
-    def item(self, sample):
-        return OrderedDict((k, e.item(s)) for k, (e, s) in dzip(self, sample))
-
-
-class BatchedTuple(tuple, Batched):
-    def batched_getitem(self, item):
-        return self.map(lambda v: v.batched_getitem(item))
-
-    def batched_setitem(self, item, value: Batched):
-        for v1, v2 in zip(self, value):
-            v1.batched_setitem(item, v2)
-
-    def apply(self, func: Callable[[Batched], Batched]) -> Batched:
-        return self.__class__(v.apply(func) for v in self)
-
-    def map(self, func: Callable[[Batched], Batched]) -> Batched:
-        return self.__class__(func(v) for v in self)
-
-    def zip(self, *iters):
-        return self.__class__(zip(self, *iters))
 
 
 class TupleEncoder(Encoder, nn.ModuleList):
+    space: spaces.Tuple
+
     def __init__(
             self,
             space: spaces.Tuple,
@@ -103,28 +62,32 @@ class TupleEncoder(Encoder, nn.ModuleList):
             embed_dim=256,
             *args, **kwargs,
     ):
-        super().__init__(
-            space,
-            modules=(
-                subencoder(space=space, embed_dim=embed_dim, *args, **kwargs)
-                for space in space.spaces
-            ),
-            *args, **kwargs,
-        )
+        super().__init__(space, *args, **kwargs)
+        for space in space.spaces:
+            encoder = subencoder(
+                space=space,
+                embed_dim=embed_dim,
+                *args, **kwargs
+            )
 
-    @staticmethod
-    def supports(space: spaces.Space) -> bool:
-        return isinstance(space, spaces.Tuple)
+            assert isinstance(encoder, Encoder), \
+                f"{encoder} should inherit from {Encoder}"
 
-    def prepare(self, sample: BatchedTuple):
-        return tuple(e.prepare(s) for e, s in zip(self, sample))
+            self.append(encoder)
+
+    @property
+    def batched(self):
+        return TupleStorage(self)
+
+    def prepare(self, sample):
+        return TupleStorage(e.prepare(s) for e, s in zip(self, sample))
+
+    def unprepare(self, sample: TupleStorage):
+        return tuple(e.item(s) for e, s in zip(self, sample.items))
 
     def sample(self, *args, **kwargs):
-        return BatchedTuple(e.sample(*args, **kwargs) for e in self)
+        return TupleStorage(e.sample(*args, **kwargs) for e in self)
 
-    def forward(self, sample):
-        encoded = [e(s) for e, s in zip(self, sample)]
+    def forward(self, sample: TupleStorage):
+        encoded = [e(s) for e, s in zip(self, sample.items)]
         return torch.cat(encoded, dim=-2)
-
-    def item(self, sample):
-        return tuple(e.item(s) for e, s in zip(self, sample))

@@ -16,7 +16,7 @@ from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
 class InvalidMemoryState(Exception):
     pass
-
+ 
 
 class GeneralQ(Agent, nn.Module):
     def __init__(
@@ -26,16 +26,16 @@ class GeneralQ(Agent, nn.Module):
             name: Optional[str] = None,
             action_encoder=DiscreteEncoder,
             observation_encoder=auto_encoder,
-            q: Optional[nn.Module] = None,
-            embed_dim: int = 256,
+            q_model: Optional[nn.Module] = None,
+            embed_dim: int = 128,
             device: torch.device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             ),
             lr: float = 1e-4,
-            epsilon: float = 1e-1,
+            epsilon: float = 5e-1,
             epsilon_decay: float = -7.0,
-            gamma: float = float("inf"),
-            replay_memory_size: int = 4096,
+            gamma: float = 5.0,
+            replay_memory_size: int = 2**18,
     ) -> None:
         """
         Args:
@@ -59,11 +59,9 @@ class GeneralQ(Agent, nn.Module):
         self.epsilon_decay = epsilon_decay
         self.gamma = gamma
 
-        self.q = q
-        if self.q is None:
-            self.q = nn.Sequential(
-                nn.Linear(embed_dim, embed_dim),
-                nn.GELU(),
+        self.q_model = q_model
+        if self.q_model is None:
+            self.q_model = nn.Sequential(
                 nn.Linear(embed_dim, embed_dim),
                 nn.GELU(),
                 nn.Linear(embed_dim, embed_dim),
@@ -92,22 +90,20 @@ class GeneralQ(Agent, nn.Module):
         )
 
     @torch.no_grad()
-    def act(self, obs: ObsType) -> tuple[ActType, float]:
+    def act(self, obs: ObsType) -> ActType:
         obs = self.observation_encoder.prepare(obs)
         actions, action_embeddings = self.action_encoder.all()
         action_embeddings = action_embeddings.sum(dim=-2)
 
         obs_embeddings = self.observation_encoder(obs).sum(dim=-2)
-        values = self.q(obs_embeddings + action_embeddings)
+        values = self.q_model(obs_embeddings + action_embeddings)
 
         if random.random() < self.epsilon:
             action_index = random.randint(0, len(action_embeddings) - 1)
-            action_value = values[action_index]
         else:
-            action_value, action_index = values.max(dim=0)
+            action_index = values.argmax(dim=0)
 
-        action = self.action_encoder.item(actions.batch[action_index])
-        return action, action_value.item()
+        return self.action_encoder.unprepare(actions.data[action_index])
 
     def remember(
             self,
@@ -136,7 +132,7 @@ class GeneralQ(Agent, nn.Module):
             truncation,
         )
 
-    def learn(self, batch_size=512) -> float:
+    def learn(self, batch_size=128) -> float:
         """
         Learn from the gameplays.
 
@@ -168,15 +164,15 @@ class GeneralQ(Agent, nn.Module):
 
         next_observations = next_observations.sum(dim=-2, keepdim=True)    # [batch_size, 1, emb]
         action_embeddings = action_embeddings.sum(dim=-2)                  # [n, emb]
-        next_qs           = self.q(next_observations + action_embeddings)  # [batch_size, n]
+        next_qs           = self.q_model(next_observations + action_embeddings)  # [batch_size, n]
         best_q, _         = next_qs.max(dim=-1)                            # [batch_size]
         discount_factor   = ~terminations / (1 + math.exp(-self.gamma))    # [batch_size]
         q_target          = rewards + best_q * discount_factor             # [batch_size]
 
         observations = observations.sum(dim=-2)        # [batch_size, emb]
         actions      = actions.sum(dim=-2)             # [batch_size, emb]
-        qs           = self.q(observations + actions)  # [batch_size]
-        loss         = F.mse_loss(qs, q_target)
+        qs           = self.q_model(observations + actions)  # [batch_size]
+        loss         = F.mse_loss(qs, q_target.detach())
         # fmt: on
 
         self.optimizer.zero_grad()
@@ -188,6 +184,10 @@ class GeneralQ(Agent, nn.Module):
 
     def update_epsilon(self):
         self.epsilon /= 1 + math.exp(self.epsilon_decay)
+    
+    def set_lr(self, lr):
+        for param_group in self.optimizer.param_groups:
+            param_group["lr"] = lr
 
     def reset(self):
         self.gameplays.close()

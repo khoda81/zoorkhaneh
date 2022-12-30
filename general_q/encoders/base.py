@@ -7,48 +7,21 @@ import torch
 from gymnasium import spaces
 from torch import nn
 
-T = TypeVar("T", bound="Batched")
+from general_q.encoders.storage import Storage
 
-
-class BatchProxy:
-    def __init__(self, batch):
-        self.batch = batch
-
-    def __getitem__(self, item):
-        return self.batch.batched_getitem(item)
-
-    def __setitem__(self, item, value):
-        self.batch.batched_setitem(item, value)
-
-
-class Batched(Generic[T]):
-    def __init__(self, data):
-        self.data = data
-
-    @property
-    def batch(self):
-        return BatchProxy(self)
-
-    def batched_getitem(self, item) -> "T":
-        return self.__class__(self.data[item])
-
-    def batched_setitem(self, item, value: "T"):
-        self.data[item] = value.data
-
-    def apply(self, func: Callable[["Batched"], "Batched"]) -> "Batched":
-        return self.__class__(func(self.data))
-
-    def __repr__(self) -> str:
-        return self.data.__repr__()
-
-
-B = TypeVar("B", bound=Batched)
+B = TypeVar("B", bound=Storage)
 I = TypeVar("I")
 
 
+class UnsupportedSpaceError(Exception):
+    pass
+
+
 class Encoder(nn.Module, ABC, Generic[I, B]):
-    def __init__(self, space: spaces.Space[I], *args, **kwargs) -> None:
-        assert self.supports(space), f"{self.__class__.__name__} does not support {space}"
+    def __init__(self, space: spaces.Space[I], *args, **kwargs):
+        if not self.supports(space):
+            raise UnsupportedSpaceError(f"{self.__class__} does not support {space}")
+
         super().__init__(*args, **kwargs)
         self.space = space
         # phantom data to track device
@@ -60,24 +33,41 @@ class Encoder(nn.Module, ABC, Generic[I, B]):
     def device(self) -> torch.device:
         return self._phantom.device
 
-    @staticmethod
-    @abstractmethod
-    def supports(space: spaces.Space) -> bool:
-        """Returns whether this encoder supports the given space."""
-        return False
+    @classmethod
+    def supports(cls, space):
+        try:
+            return (
+                not hasattr(cls, "__annotations__") or
+                "space" not in cls.__annotations__ or
+                isinstance(space, cls.__annotations__["space"])
+            )
+        except TypeError:
+            raise TypeError(
+                f"Failed to determine if {space} is supported by {cls}. "
+                f"Consider writing a `supports` method for the encoder."
+            )
 
     @abstractmethod
     def prepare(self, sample: I) -> B:
         """Prepare sample for forward pass."""
 
     @abstractmethod
+    def unprepare(self, sample):
+        """Convert a sample to the python type."""
+
+    @abstractmethod
     def sample(self, batch_shape: Iterable[int] = ()) -> B:
-        """Sample a batch of samples from the space."""
+        """Sample a batch of samples from the space. Should be prepared."""
 
     @abstractmethod
     def forward(self, sample: B) -> torch.FloatTensor:
-        """Encode the given sample."""
+        """
+        Encode the given sample and return encoded tensor.
 
-    @abstractmethod
-    def item(self, sample):
-        """Convert a sample to the python type."""
+        Args:
+            sample: A prepared sample.
+
+        Returns:
+            A batch of sequence of tokens: (*batch_shape, T, embed_dim), where T
+            is the number of tokens.
+        """
