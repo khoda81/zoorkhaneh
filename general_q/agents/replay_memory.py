@@ -1,6 +1,12 @@
+import warnings
+
 import torch
 
 from general_q.encoders import Encoder
+
+
+class InvalidMemoryState(Exception):
+    pass
 
 
 class ReplayMemory:
@@ -27,32 +33,54 @@ class ReplayMemory:
         self.last = capacity - 1
         self.size = 0
 
-    def push(
+    def append(
             self,
             new_observation,
-            action,
+            action=None,
             reward=0.0,
-            termination=False,
-            truncation=False,
+            terminated=False,
+            truncated=False,
     ) -> None:
-        # TODO profile push
+        # TODO profile append
+        observation = self.observation_encoder.prepare(new_observation)
+
+        if action is None and None not in self.action_encoder.space:  # TODO What if None is a valid action?
+            action = self.action_encoder.sample(batch_shape=())
+
+            term = self.terminations[self.last]
+            trunc = self.truncations[self.last]
+
+            if not (term or trunc):
+                raise InvalidMemoryState(
+                    f"No action was provided meaning this is the initial observation, but "
+                    f"the last memory state is {~term * 'non-'}terminal and {~trunc * 'non-'}truncated. "
+                )
+
+            if terminated or truncated:
+                warnings.warn(
+                    f"No action was provided meaning this is the initial observation, but"
+                    f"the new state is {~terminated * 'non-'}terminal and {~truncated * 'non-'}truncated. "
+                    f"Agent can't be terminated before it has been created!"
+                )
+        else:
+            action = self.action_encoder.prepare(action)
+
         self.last = (self.last + 1) % self.capacity
-
-        # fmt: off
-        self.observations[self.last] = self.observation_encoder.prepare(new_observation)
-        self.actions     [self.last] = self.action_encoder.prepare(action)
-        self.rewards     [self.last] = reward
-        self.terminations[self.last] = termination
-        self.truncations [self.last] = truncation
-        # fmt: on
-
         self.size = min(self.size + 1, self.capacity)
 
-    def valid_indices(self):
-        is_valid = ~self.terminations & ~self.truncations
-        is_valid[self.last] = False
+        # fmt: off
+        self.observations[self.last] = observation
+        self.actions     [self.last] = action
+        self.rewards     [self.last] = reward
+        self.terminations[self.last] = terminated
+        self.truncations [self.last] = truncated
+        # fmt: on
 
-        indices, = torch.where(is_valid)
+    def valid_indices(self):
+        invalid = self.terminations | self.truncations
+        invalid[self.last] = True
+
+        indices, = torch.where(~invalid)
         return indices
 
     def sample(self, batch_size: int):

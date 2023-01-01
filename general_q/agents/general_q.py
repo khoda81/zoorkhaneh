@@ -4,8 +4,8 @@ import math
 import random
 
 import torch
+from gymnasium import Space
 from gymnasium.core import ActType, ObsType
-from gymnasium.spaces import Space
 from torch import nn, optim
 from torch.nn import functional as F
 
@@ -13,10 +13,6 @@ from general_q.agents.base import Agent
 from general_q.agents.replay_memory import ReplayMemory
 from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
-
-class InvalidMemoryState(Exception):
-    pass
- 
 
 class GeneralQ(Agent, nn.Module):
     def __init__(
@@ -27,15 +23,15 @@ class GeneralQ(Agent, nn.Module):
             action_encoder=DiscreteEncoder,
             observation_encoder=auto_encoder,
             q_model: Optional[nn.Module] = None,
-            embed_dim: int = 128,
+            embed_dim: int = 256,
             device: torch.device = torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             ),
             lr: float = 1e-4,
             epsilon: float = 5e-1,
             epsilon_decay: float = -7.0,
-            gamma: float = 5.0,
-            replay_memory_size: int = 2**18,
+            gamma: float = 4.0,
+            replay_memory_size: int = 2**16,
     ) -> None:
         """
         Args:
@@ -68,19 +64,32 @@ class GeneralQ(Agent, nn.Module):
                 nn.GELU(),
                 nn.Linear(embed_dim, embed_dim),
                 nn.GELU(),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
                 nn.Linear(embed_dim, 1),
                 nn.Flatten(-2),
             )
 
+        # TODO move encoders to the q module to add more flexibility and
+        # TODO manage unintended side effects of changing encoders and q model
+        # TODO after initialization
         self.action_encoder = action_encoder(action_space, embed_dim)
-        assert isinstance(self.action_encoder, Encoder), f"{self.action_encoder} should inherit from {Encoder}"
+        assert isinstance(self.action_encoder, Encoder), \
+            f"{self.action_encoder} should inherit from {Encoder}"
 
         self.observation_encoder = observation_encoder(observation_space, embed_dim)
-        assert isinstance(
-            self.observation_encoder, Encoder
-        ), f"{self.observation_encoder} should inherit from {Encoder}"
+        assert isinstance(self.observation_encoder, Encoder), \
+            f"{self.observation_encoder} should inherit from {Encoder}"
 
-        self.optimizer = optim.Adam(self.parameters(), lr=lr)
+        self.optimizer = optim.Adam(
+            self.parameters(),
+            lr=lr,
+            betas=(0.9, 0.999),
+            eps=1e-08,
+            weight_decay=0,
+            amsgrad=False,
+        )
+
         self.to(device)
 
         self.gameplays = ReplayMemory(
@@ -103,28 +112,20 @@ class GeneralQ(Agent, nn.Module):
         else:
             action_index = values.argmax(dim=0)
 
-        return self.action_encoder.unprepare(actions.data[action_index])
+        return self.action_encoder.unprepare(actions[action_index])
 
-    def remember(
+    def remember_initial(self, observation: ObsType) -> None:
+        self.gameplays.append(observation)
+
+    def remember_transition(
             self,
             new_observation,
-            action=None,
-            reward=0,
-            termination=False,
-            truncation=False,
+            action,
+            reward,
+            termination,
+            truncation,
     ) -> None:
-        if action is None:
-            action = self.action_space.sample()
-            if self.gameplays.size != 0:
-                _, _, _, term, trunc, _ = self.gameplays[self.gameplays.last - 1]
-
-                if not (term or trunc):
-                    raise InvalidMemoryState(
-                        f"The last memory state was {~term * 'non-'}terminal and {~trunc * 'non-'}truncated, but no action was provided. "
-                        f"Did you forget to call `agent.reset()` before `agent.remember(obs)`?"
-                    )
-
-        self.gameplays.push(
+        self.gameplays.append(
             new_observation,
             action,
             reward,
@@ -142,6 +143,7 @@ class GeneralQ(Agent, nn.Module):
         Returns:
             The loss value.
         """
+        self.update_epsilon()
 
         batch_size = min(batch_size, len(self.gameplays))
         if batch_size == 0:
@@ -152,39 +154,64 @@ class GeneralQ(Agent, nn.Module):
             actions,
             rewards,
             terminations,
-            _truncations,
+            truncations,
             next_observations,
         ) = self.gameplays.sample(batch_size)
 
-        # fmt: off
-        observations         = self.observation_encoder(observations)       # [batch_size, s, emb]
-        actions              = self.action_encoder(actions)                 # [batch_size, s, emb]
-        next_observations    = self.observation_encoder(next_observations)  # [batch_size, s, emb]
-        _, action_embeddings = self.action_encoder.all()                    # [n, s, emb]
+        loss = self.calculate_loss(
+            observations,
+            actions,
+            rewards,
+            terminations,
+            truncations,
+            next_observations,
+        )
 
-        next_observations = next_observations.sum(dim=-2, keepdim=True)    # [batch_size, 1, emb]
-        action_embeddings = action_embeddings.sum(dim=-2)                  # [n, emb]
-        next_qs           = self.q_model(next_observations + action_embeddings)  # [batch_size, n]
-        best_q, _         = next_qs.max(dim=-1)                            # [batch_size]
-        discount_factor   = ~terminations / (1 + math.exp(-self.gamma))    # [batch_size]
-        q_target          = rewards + best_q * discount_factor             # [batch_size]
-
-        observations = observations.sum(dim=-2)        # [batch_size, emb]
-        actions      = actions.sum(dim=-2)             # [batch_size, emb]
-        qs           = self.q_model(observations + actions)  # [batch_size]
-        loss         = F.mse_loss(qs, q_target.detach())
-        # fmt: on
+        # idx = torch.where(self.gameplays.terminations[:-1] & ~self.gameplays.terminations[1:])[0][0]
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-
-        self.update_epsilon()
         return loss.item()
+
+    def calculate_loss(
+            self,
+            observations_,
+            actions_,
+            rewards,
+            terminations,
+            truncations,
+            next_observations_,
+    ) -> torch.Tensor:
+        """
+        Calculate the loss value for this specified transitions
+        """
+        # fmt: off
+        observations         = self.observation_encoder(observations_)       # [batch_size, s, emb]
+        actions              = self.action_encoder(actions_)                 # [batch_size, s, emb]
+        next_observations    = self.observation_encoder(next_observations_)  # [batch_size, s, emb]
+        _, action_embeddings = self.action_encoder.all()                     # [n, s, emb]
+
+        next_observations = next_observations.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
+        action_embeddings = action_embeddings.sum(dim=-2)                        # [n, emb]
+        next_qs           = self.q_model(next_observations + action_embeddings)  # [batch_size, n]
+        best_q, _         = next_qs.max(dim=-1)                                  # [batch_size]
+        # discount factor is zero where the episode has terminated and 
+        # sigmoid(self.gamma) everywhere else
+        discount_factor   = ~terminations / (1 + math.exp(-self.gamma))          # [batch_size]
+        q_target          = rewards + best_q * discount_factor                   # [batch_size]
+
+        observations = observations.sum(dim=-2)              # [batch_size, emb]
+        actions      = actions.sum(dim=-2)                   # [batch_size, emb]
+        q            = self.q_model(observations + actions)  # [batch_size]
+        loss         = F.mse_loss(q, q_target.detach())
+        # fmt: on
+
+        return loss
 
     def update_epsilon(self):
         self.epsilon /= 1 + math.exp(self.epsilon_decay)
-    
+
     def set_lr(self, lr):
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr

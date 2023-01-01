@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-from gymnasium import spaces
+from gymnasium import Space, spaces
 from numpy.typing import NDArray
 from torch import nn
 
@@ -23,7 +23,7 @@ def unflatten(tensor, dim, sizes):
 
 
 class TensorEncoder(Encoder[I, TensorStorage], ABC, Generic[I]):
-    def __init__(self, space: spaces.Space[I], *args, **kwargs):
+    def __init__(self, space: Space[I], *args, **kwargs):
         super().__init__(space)
         sample = torch.tensor(space.sample())
         self.dtype = sample.dtype
@@ -41,7 +41,7 @@ class TensorEncoder(Encoder[I, TensorStorage], ABC, Generic[I]):
     def unprepare(self, sample: TensorStorage) -> NDArray:
         return sample.data.cpu().numpy()
 
-    def sample(self, batch_shape=(), mini_batch_size=-1) -> TensorStorage:
+    def sample(self, batch_shape=(), mini_batch_size=4096) -> TensorStorage:
         sample: list[torch.Tensor] = []
         batch_size = math.prod(batch_shape)
         if mini_batch_size <= 0:
@@ -81,6 +81,6 @@ class FloatTensorEncoder(TensorEncoder):
         return sample
 
     @classmethod
-    def supports(cls, space: spaces.Space) -> bool:
+    def supports(cls, space: Space) -> bool:
         dtypes = [np.float16, np.float32, np.float64]
         return super().supports(space) and space.dtype in dtypes

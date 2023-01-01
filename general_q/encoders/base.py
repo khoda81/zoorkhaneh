@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 import torch
-from gymnasium import spaces
+from gymnasium import Space
 from torch import nn
 
 from general_q.encoders.storage import Storage
@@ -18,7 +18,7 @@ class UnsupportedSpaceError(Exception):
 
 
 class Encoder(nn.Module, ABC, Generic[I, B]):
-    def __init__(self, space: spaces.Space[I], *args, **kwargs):
+    def __init__(self, space: Space[I], *args, **kwargs):
         if not self.supports(space):
             raise UnsupportedSpaceError(f"{self.__class__} does not support {space}")
 
@@ -57,7 +57,15 @@ class Encoder(nn.Module, ABC, Generic[I, B]):
 
     @abstractmethod
     def sample(self, batch_shape: Iterable[int] = ()) -> B:
-        """Sample a batch of samples from the space. Should be prepared."""
+        """
+        Sample a batch of samples from the space. Returned sample is always prepared.
+
+        Args:
+            batch_shape: Shape of the sample batch.
+        """
+
+    # TODO add empty() method or an argument to sample, for empty samples
+    # TODO useful when we need a dummy sample and sample is too slow for it
 
     @abstractmethod
     def forward(self, sample: B) -> torch.FloatTensor:

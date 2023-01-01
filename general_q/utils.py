@@ -1,4 +1,8 @@
+from typing import Optional, Union
+
+import pickle
 from itertools import count
+from pathlib import Path
 
 from gymnasium import Env
 from tqdm import tqdm, trange
@@ -6,7 +10,7 @@ from tqdm import tqdm, trange
 from general_q.agents import Agent
 
 
-def play(
+def evaluate(
         env: Env,
         agent: Agent,
         steps: int,
@@ -42,41 +46,30 @@ def play(
             agent.reset()
 
             if train:
-                agent.remember(observation)
+                agent.remember_initial(observation)
 
             tot_rew = 0
             eps_loss = 0
             with tqdm(count(1), leave=False, total=max_step) as episode_pbar:
                 for episode_step in episode_pbar:
                     action = agent(observation)
-                    (
-                        observation,
-                        reward,
-                        termination,
-                        truncation,
-                        info,
-                    ) = env.step(action)
+                    observation, reward, termination, truncation, info = env.step(action)
+
+                    step_callback(
+                        observation=observation,
+                        action=action,
+                        reward=reward,
+                        termination=termination,
+                        truncation=truncation,
+                        info=info,
+                        step=step_pbar.n,
+                    )
 
                     tot_rew += reward
 
-                    step_callback(
-                        step_pbar.n,
-                        observation,
-                        action,
-                        reward,
-                        termination,
-                        truncation
-                    )
-
                     description = ""
                     if train:
-                        agent.remember(
-                            observation,
-                            action,
-                            reward,
-                            termination,
-                            truncation
-                        )
+                        agent.remember_transition(observation, action, reward, termination, truncation)
 
                         loss = agent.learn()
                         description += f"{loss=:6.3f}, "
@@ -93,10 +86,47 @@ def play(
                         break
 
             episode_callback(
-                step_pbar.n,
-                episode_step,
-                eps_loss / episode_step,
-                tot_rew,
+                step=step_pbar.n,
+                length=episode_step,
+                loss=eps_loss / episode_step,
+                reward=tot_rew,
             )
 
             step_pbar.set_description(f"last_reward: {tot_rew:6.2f}")
+
+
+def save_pretrained(agent: Agent, path: Union[str, Path]):
+    """
+    Save the agent to the given path.
+
+    Args:
+        path: The path to save the agent to.
+    """
+
+    path = Path(path) / f"{agent.name}.{agent.__class__.__name__}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(path, "wb") as f:
+        pickle.dump(agent, f)
+
+
+def load_pretrained(
+        path: Union[str, Path],
+        raise_error: bool = True,
+) -> Optional[Agent]:
+    """
+    Try to load the agent from the given path.
+
+    Args:
+        path: The path to load the agent from.
+        raise_error: Whether to raise an error if the agent could not be loaded.
+
+    Returns:
+        The loaded agent if the agent could be loaded.
+    """
+    try:
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    except (FileNotFoundError, EOFError, pickle.UnpicklingError):
+        if raise_error:
+            raise

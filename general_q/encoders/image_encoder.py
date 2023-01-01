@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from gymnasium import spaces
+from gymnasium import Space, spaces
 from numpy.typing import NDArray
 from torch import nn
 
@@ -41,7 +41,7 @@ class ImageEncoder(TensorEncoder):
         return self.encoder
 
     @staticmethod
-    def supports(space: spaces.Space) -> bool:
+    def supports(space: Space) -> bool:
         # fmt: off
         if not (
                 type(space)      == spaces.Box
@@ -65,7 +65,7 @@ class ImageEncoder(TensorEncoder):
     def forward(self, sample: TensorStorage) -> torch.Tensor:
         # we normalize only when forwarding to save memory
         # floats more than 4x the space of uint8s
-        sample = sample.transform(lambda x: x / 255 + .5)
+        sample = sample.transform(lambda x: x / 255 - .5)
         return super().forward(sample)
 
     def unprepare(self, sample: TensorStorage) -> NDArray:

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 
-import gymnasium
 import torch
-from gymnasium import spaces
+from gymnasium import Space, spaces
 from torch import distributions, nn
 
 
@@ -11,7 +10,7 @@ class Distribution:
 
 
 class Decoder(ABC, nn.Module):
-    def __init__(self, space: gymnasium.Space):
+    def __init__(self, space: Space):
         super().__init__()
         self.space = space
 

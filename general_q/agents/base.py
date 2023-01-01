@@ -1,8 +1,6 @@
-from typing import Optional, Union
+from typing import Generic, Optional
 
-import pickle
 import random
-from abc import ABC
 from pathlib import Path
 
 from gymnasium import Space
@@ -14,7 +12,8 @@ with open(NAMES_PATH) as f:
     NAMES = f.read().splitlines()
 
 
-class Agent(ABC):  # TODO maybe inherit from nn.Module
+class Agent(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
+    # TODO implement an api for switching the same agent between different environments
     def __init__(
             self,
             action_space: Space[ActType],
@@ -43,7 +42,7 @@ class Agent(ABC):  # TODO maybe inherit from nn.Module
         Act based on the observation.
 
         Args:
-            obs (np.ndarray): Observation from the environment.
+            obs: Observation from the environment.
 
         Returns:
             The action to take.
@@ -55,17 +54,25 @@ class Agent(ABC):  # TODO maybe inherit from nn.Module
         Reset the state of the agent and get ready for next episode.
         """
 
+    def remember_initial(self, observation: ObsType) -> None:
+        """
+        Append the initial observation to the memory for training purposes.
+
+        Args:
+            observation: The initial observation.
+        """
+
     def remember(
             self,
             new_observation: ObsType,
-            action: Optional[ActType] = None,
-            reward: float = 0.0,
-            termination: bool = False,
-            truncation: bool = False,
+            action: ActType,
+            reward: float,
+            termination: bool,
+            truncation: bool,
     ) -> None:
         """
         Remember the action and the consequences. Data stored by this method should only be used for learning.
-        Agent state should be stored in the agent as attributes and managed by `agent.act` and `agent.reset`.
+        Agent state should be stored in object attributes and managed by `agent.act` and `agent.reset`.
 
         Args:
             new_observation: The observation after the action.
@@ -75,6 +82,12 @@ class Agent(ABC):  # TODO maybe inherit from nn.Module
             truncation: Whether the episode is truncated.
         """
 
+    # TODO maybe letting the agent manage the training process is not a good idea
+    # TODO i.e: the optimizer being in an invalid state after changing one of
+    # TODO the submodules manually
+    # TODO maybe the agent should just return the loss value and the training
+    # TODO should be done by the user
+    # TODO this would also allow for more flexibility in the training process
     def learn(self) -> float:
         """
         Perform one training step.
@@ -96,39 +109,3 @@ class Agent(ABC):  # TODO maybe inherit from nn.Module
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(name={self.name!r})'
-
-    def save_pretrained(self, path: Union[str, Path]):
-        """
-        Save the agent to the given path.
-
-        Args:
-            path: The path to save the agent to.
-        """
-
-        path = Path(path) / f"{self.name}.{self.__class__.__name__}"
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(path, "wb") as f:
-            pickle.dump(self, f)
-
-    @staticmethod
-    def load_pretrained(
-            path: Union[str, Path],
-            raise_error: bool = True,
-    ) -> Optional["Agent"]:
-        """
-        Load the agent from the given path.
-
-        Args:
-            path: The path to load the agent from.
-            raise_error: Whether to raise an error if the agent could not be loaded.
-
-        Returns:
-            The loaded agent or None if the agent could not be loaded.
-        """
-        try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
-        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
-            if raise_error:
-                raise

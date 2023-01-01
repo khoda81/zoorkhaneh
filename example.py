@@ -8,7 +8,7 @@ import torch
 import wandb
 
 from general_q.agents import Agent, GeneralQ
-from general_q.utils import play
+from general_q.utils import evaluate, load_pretrained, save_pretrained
 
 lt.monkey_patch()
 lt.set_config(precision=4, sci_mode=False)
@@ -18,30 +18,36 @@ SAVE_PATH = Path("tmp/pretrained")
 
 
 def train(wandb_project="general_q") -> None:
-    # env = gymnasium.make("CartPole-v1", render_mode="human")
+    render_mode = "human"
+    # render_mode = None
+
+    # env_name = "Acrobot-v1"
+    # env_name = "BipedalWalker-v3"
+    # env_name = "Blackjack-v1"
+    # env_name = "CarRacing-v2"
+    # env_name = "CartPole-v1"
+    env_name = "CliffWalking-v0"
+    # env_name = "LunarLander-v2"
+    # env_name = "MountainCarContinuous-v01"
+    # env_name = "Pendulum-v1"
+
+    env = gymnasium.make(
+        id=env_name,
+        render_mode=render_mode,
+        # continuous=False,
+    )
+
     env = gymnasium.wrappers.TransformReward(
-        gymnasium.make(
-            "LunarLander-v2",
-            render_mode="human",
-        ),
+        env,
         # lambda r: 1e-0 * r,
         # lambda r: 1e-1 * r,
         lambda r: 1e-2 * r,
+        # lambda r: 1e-3 * r,
+        # lambda r: 1e-4 * r,
     )
-    # env = gymnasium.make("Acrobot-v1", render_mode="human")
-    # env = gymnasium.wrappers.TransformReward(gymnasium.make('Pendulum-v1', render_mode="human"), lambda r: 0.1 * r)
-    # env = gymnasium.make("MountainCarContinuous-v0", render_mode="human")
-    # env = gymnasium.make('CliffWalking-v0')
-    # env = gymnasium.make('CliffWalking-v0', render_mode="human")
-    # env = gymnasium.make("CarRacing-v2", render_mode="human")
-    # env = gymnasium.wrappers.TimeLimit(gymnasium.make("CarRacing-v2", render_mode="human"), max_episode_steps=100)
-    # env = gymnasium.make("BipedalWalker-v3", render_mode="human")
-    # env = gymnasium.make(
-    #     "Blackjack-v1",
-    #     # render_mode="human",
-    # )
 
     agent = load_agent(SAVE_PATH, env) or create_agent(env)
+    # agent = create_agent(env)
 
     print("Training:")
     print(f"\tAgent: {agent}")
@@ -49,19 +55,16 @@ def train(wandb_project="general_q") -> None:
 
     def save_agent(step, *args, **kwargs):
         if step % 1000 == 0:
-            agent.save_pretrained(SAVE_PATH)
+            save_pretrained(agent, SAVE_PATH)
 
     def log_to_wandb(step, length, loss, reward, *args, **kwargs):
-        wandb.log(
-            {
-                "step":   step,
-                "loss":   loss,
-                "reward": reward,
-                "length": length,
-            }
-        )
+        wandb.log({
+            "step":   step,
+            "loss":   loss,
+            "reward": reward,
+            "length": length,
+        })
 
-    # wandb.login(relogin=True)
     wandb.init(
         project=wandb_project,
         dir=SAVE_PATH.parent,
@@ -69,16 +72,16 @@ def train(wandb_project="general_q") -> None:
     )
 
     with env, agent:
-        play(
+        evaluate(
             env,
             agent,
-            200000,
+            steps=1_000_000,
             train=True,
             step_callback=save_agent,
             episode_callback=log_to_wandb,
         )
 
-    agent.save_pretrained(SAVE_PATH)
+    save_pretrained(agent, SAVE_PATH)
 
 
 def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
@@ -89,10 +92,11 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
 
     best_time, best_agent = -float("inf"), None
     for path in path.iterdir():
-        agent = GeneralQ.load_pretrained(path, raise_error=False)
+        agent = load_pretrained(path, raise_error=True)
         if agent is None:
             continue
 
+        agent: Agent
         if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
             continue
 
@@ -105,8 +109,8 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
 
 def create_agent(env: gymnasium.Env) -> Agent:
     return GeneralQ(
-        env.action_space,
-        env.observation_space,
+        action_space=env.action_space,
+        observation_space=env.observation_space,
     )
 
 
