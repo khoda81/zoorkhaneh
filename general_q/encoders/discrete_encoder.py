@@ -2,6 +2,7 @@ import torch
 from gymnasium import spaces
 from torch import nn
 
+from general_q.encoders.storage import TensorStorage
 from general_q.encoders.tensor_encoder import TensorEncoder
 
 
@@ -26,3 +27,6 @@ class DiscreteEncoder(TensorEncoder[int]):
         """Make a batch of all possible values of this encoder"""
         items = self.prepare(range(self.space.n))
         return items, self(items)
+
+    def unprepare(self, sample: TensorStorage) -> int:
+        return sample.data.item()

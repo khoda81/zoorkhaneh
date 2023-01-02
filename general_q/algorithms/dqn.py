@@ -9,12 +9,12 @@ from gymnasium.core import ActType, ObsType
 from torch import nn, optim
 from torch.nn import functional as F
 
-from general_q.agents.base import Agent
-from general_q.agents.replay_memory import ReplayMemory
+from general_q.algorithms.base import Algorithm
+from general_q.algorithms.replay_memory import ReplayMemory
 from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
 
-class GeneralQ(Agent, nn.Module):
+class DQN(Algorithm, nn.Module):
     def __init__(
             self,
             action_space: Space[ActType],
@@ -44,7 +44,7 @@ class GeneralQ(Agent, nn.Module):
             embed_dim: The embedding dimension.
             device: The device to use.
             lr: Learning rate
-            epsilon: Exploration rate, updated in `agent.update_epsilon()` which is called every time in `agent.learn()` 
+            epsilon: Exploration rate, updated in `agent.update_epsilon()` which is called every time in `agent.learn()`
             epsilon_decay: `epsilon <- epsilon * sigmoid(-epsilon_decay)`
             gamma: Discount factor, `q(s, a) <- r + sigmoid(gamma) * max(a', q(s', a'))`
             replay_memory_size: The size of the replay memory.
@@ -167,8 +167,6 @@ class GeneralQ(Agent, nn.Module):
             next_observations,
         )
 
-        # idx = torch.where(self.gameplays.terminations[:-1] & ~self.gameplays.terminations[1:])[0][0]
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -176,27 +174,27 @@ class GeneralQ(Agent, nn.Module):
 
     def calculate_loss(
             self,
-            observations_,
-            actions_,
+            observations,
+            actions,
             rewards,
             terminations,
             truncations,
-            next_observations_,
+            next_observations,
     ) -> torch.Tensor:
         """
         Calculate the loss value for this specified transitions
         """
         # fmt: off
-        observations         = self.observation_encoder(observations_)       # [batch_size, s, emb]
-        actions              = self.action_encoder(actions_)                 # [batch_size, s, emb]
-        next_observations    = self.observation_encoder(next_observations_)  # [batch_size, s, emb]
+        observations         = self.observation_encoder(observations)       # [batch_size, s, emb]
+        actions              = self.action_encoder(actions)                 # [batch_size, s, emb]
+        next_observations    = self.observation_encoder(next_observations)  # [batch_size, s, emb]
         _, action_embeddings = self.action_encoder.all()                     # [n, s, emb]
 
         next_observations = next_observations.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
         action_embeddings = action_embeddings.sum(dim=-2)                        # [n, emb]
         next_qs           = self.q_model(next_observations + action_embeddings)  # [batch_size, n]
         best_q, _         = next_qs.max(dim=-1)                                  # [batch_size]
-        # discount factor is zero where the episode has terminated and 
+        # discount factor is zero where the episode has terminated and
         # sigmoid(self.gamma) everywhere else
         discount_factor   = ~terminations / (1 + math.exp(-self.gamma))          # [batch_size]
         q_target          = rewards + best_q * discount_factor                   # [batch_size]

@@ -12,7 +12,7 @@ with open(NAMES_PATH) as f:
     NAMES = f.read().splitlines()
 
 
-class Agent(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
+class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
     # TODO implement an api for switching the same agent between different environments
     def __init__(
             self,

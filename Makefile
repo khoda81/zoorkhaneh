@@ -17,7 +17,7 @@ install:
 
 .PHONY: publish
 publish:
-	poetry publish --build --username $ENV:PYPI_USERNAME --password $ENV:PYPI_PASSWORD
+	poetry publish --build --username $PYPI_USERNAME --password $PYPI_PASSWORD
 
 .PHONY: pre-commit-install
 pre-commit-install:

@@ -7,7 +7,7 @@ import lovely_tensors as lt
 import torch
 import wandb
 
-from general_q.agents import Agent, GeneralQ
+from general_q.algorithms import DQN, Algorithm
 from general_q.utils import evaluate, load_pretrained, save_pretrained
 
 lt.monkey_patch()
@@ -18,43 +18,19 @@ SAVE_PATH = Path("tmp/pretrained")
 
 
 def train(wandb_project="general_q") -> None:
-    render_mode = "human"
-    # render_mode = None
-
-    # env_name = "Acrobot-v1"
-    # env_name = "BipedalWalker-v3"
-    # env_name = "Blackjack-v1"
-    # env_name = "CarRacing-v2"
-    # env_name = "CartPole-v1"
-    env_name = "CliffWalking-v0"
-    # env_name = "LunarLander-v2"
-    # env_name = "MountainCarContinuous-v01"
-    # env_name = "Pendulum-v1"
-
-    env = gymnasium.make(
-        id=env_name,
-        render_mode=render_mode,
-        # continuous=False,
-    )
-
-    env = gymnasium.wrappers.TransformReward(
-        env,
-        # lambda r: 1e-0 * r,
-        # lambda r: 1e-1 * r,
-        lambda r: 1e-2 * r,
-        # lambda r: 1e-3 * r,
-        # lambda r: 1e-4 * r,
-    )
-
+    env = create_env()
     agent = load_agent(SAVE_PATH, env) or create_agent(env)
     # agent = create_agent(env)
 
     print("Training:")
     print(f"\tAgent: {agent}")
-    print(f"\tEnvironment: {env}")
+    try:
+        print(f"\tEnv:   {env.unwrapped.spec.id}")
+    except AttributeError:
+        print(f"\tEnv:   {env.unwrapped!s}")
 
     def save_agent(step, *args, **kwargs):
-        if step % 1000 == 0:
+        if (step + 1) % 2000 == 0:
             save_pretrained(agent, SAVE_PATH)
 
     def log_to_wandb(step, length, loss, reward, *args, **kwargs):
@@ -83,8 +59,36 @@ def train(wandb_project="general_q") -> None:
 
     save_pretrained(agent, SAVE_PATH)
 
+def create_env():
+    env = gymnasium.make(
+        # id="Acrobot-v1",
+        # id="BipedalWalker-v3",
+        # id="Blackjack-v1",
+        # id="CarRacing-v2",
+        id="CartPole-v1",
+        # id="CliffWalking-v0",
+        # id="LunarLander-v2",
+        # id="MountainCarContinuous-v01",
+        # id="Pendulum-v1",
 
-def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
+        render_mode="human",
+        # render_mode=None,
+
+        # continuous=False,
+    )
+
+    # env = gymnasium.wrappers.TransformReward(
+    #     env,
+    #     lambda r: 1e-1 * r,
+    #     # lambda r: 1e-2 * r,
+    #     # lambda r: 1e-3 * r,
+    #     # lambda r: 1e-4 * r,
+    # )
+
+    return env
+
+
+def load_agent(path, env: gymnasium.Env) -> Optional[Algorithm]:
     path = Path(path)
 
     if not path.exists():
@@ -96,7 +100,7 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
         if agent is None:
             continue
 
-        agent: Agent
+        agent: Algorithm
         if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
             continue
 
@@ -107,8 +111,8 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
     return best_agent
 
 
-def create_agent(env: gymnasium.Env) -> Agent:
-    return GeneralQ(
+def create_agent(env: gymnasium.Env) -> Algorithm:
+    return DQN(
         action_space=env.action_space,
         observation_space=env.observation_space,
     )

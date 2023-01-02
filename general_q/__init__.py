@@ -1,7 +1,7 @@
 # type: ignore[attr-defined]
 """An easy to use library for general purpose reinforcement learning and experimentation"""
 
-from . import agents, encoders, utils
+from . import algorithms, encoders, utils
 
 
 def get_version() -> str:
