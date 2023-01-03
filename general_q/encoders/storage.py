@@ -1,14 +1,12 @@
 from typing import Any, Callable
 
-import functools
-import operator
 from abc import abstractmethod, abstractproperty
 from collections import OrderedDict
 
 
 class Storage:
     @abstractmethod
-    def transform(self, func: Callable[["Storage"], "Storage"]) -> "Storage":
+    def apply(self, transform: Callable[[Any], Any]) -> "Storage":
         pass
 
     @abstractproperty
@@ -40,8 +38,8 @@ class TensorStorage(Storage):
     def shape(self):
         return self.data.shape
 
-    def transform(self, func):
-        return self.__class__(func(self.data))
+    def apply(self, transform):
+        return self.__class__(transform(self.data))
 
     def __getitem__(self, item):
         return self.__class__(self.data[item])
@@ -57,18 +55,15 @@ class TensorStorage(Storage):
 
 
 def dzip(*mappings, collect=tuple):
-    keys = set(functools.reduce(
-        operator.and_,
-        (mapping.keys() for mapping in mappings),
-    ))
+    keys = set()
 
     for mapping in mappings:
         for key in mapping:
-            if key not in keys:
+            if key in keys:
                 continue
 
             yield key, collect(mapping[key] for mapping in mappings)
-            keys.remove(key)
+            keys.add(key)
 
 
 class MapStorage(Storage):
@@ -78,8 +73,11 @@ class MapStorage(Storage):
         super().__init__()
         self.map = OrderedDict(*args, **kwargs)
 
-    def transform(self, func):
-        return self.__class__((k, v.apply(func)) for k, v in self.items())
+    def apply(self, transform):
+        return self.__class__(
+            (k, v.apply(transform))
+            for k, v in self.map.items()
+        )
 
     @property
     def shape(self):
@@ -89,10 +87,13 @@ class MapStorage(Storage):
         return self.map.__repr__()
 
     def __getitem__(self, item):
-        return self.__class__((k, v[item]) for k, v in self.map.items())
+        return self.__class__(
+            (k, v[item])
+            for k, v in self.map.items()
+        )
 
     def __setitem__(self, item, value: "MapStorage"):
-        for _, (v1, v2) in dzip(self.map, value):
+        for _, (v1, v2) in dzip(self.map, value.map):
             v1[item] = v2
 
     def __delitem__(self, item):
@@ -115,11 +116,12 @@ class TupleStorage(Storage):
         super().__init__()
         self.items = tuple(data)
 
-    def transform(self, func):
-        return self.__class__(v.apply(func) for v in self.items)
+    def apply(self, transform):
+        return self.__class__(v.apply(transform) for v in self.items)
 
+    @property
     def shape(self):
-        return tuple(v.batch_shape() for v in self.items)
+        return tuple(v.shape for v in self.items)
 
     def __repr__(self):
         return self.items.__repr__()

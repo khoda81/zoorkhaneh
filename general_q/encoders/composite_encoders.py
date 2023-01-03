@@ -13,7 +13,7 @@ class DictEncoder(Encoder, nn.ModuleDict):
             self,
             space: spaces.Dict,
             subencoder,
-            embed_dim=256,
+            embed_dim,
             *args, **kwargs,
     ):
         super().__init__(space, *args, **kwargs)
@@ -59,7 +59,7 @@ class TupleEncoder(Encoder, nn.ModuleList):
             self,
             space: spaces.Tuple,
             subencoder,
-            embed_dim=256,
+            embed_dim,
             *args, **kwargs,
     ):
         super().__init__(space, *args, **kwargs)

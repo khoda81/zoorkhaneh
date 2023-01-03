@@ -1,8 +1,9 @@
-import warnings
-
 import torch
+from gymnasium import spaces
 
 from general_q.encoders import Encoder
+from general_q.encoders.composite_encoders import DictEncoder
+from general_q.encoders.tensor_encoder import TensorEncoder
 
 
 class InvalidMemoryState(Exception):
@@ -18,6 +19,7 @@ class ReplayMemory:
             device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     ):
         # TODO remove observation and action encoders from replay memory
+        # TODO stop allocating all memory at once, implement dynamic list
         # TODO remove device
         # fmt: off
         self.observation_encoder = observation_encoder
@@ -33,58 +35,60 @@ class ReplayMemory:
         self.last = capacity - 1
         self.size = 0
 
-    def append(
-            self,
-            new_observation,
-            action=None,
-            reward=0.0,
-            terminated=False,
-            truncated=False,
-    ) -> None:
-        # TODO profile append
-        observation = self.observation_encoder.prepare(new_observation)
+    def append_initial(self, observation) -> None:
+        term = self.terminations[self.last]
+        trunc = self.truncations[self.last]
 
-        if action is None and None not in self.action_encoder.space:  # TODO What if None is a valid action?
-            action = self.action_encoder.sample(batch_shape=())
+        if not (term or trunc):
+            raise InvalidMemoryState(
+                f"No action was provided meaning this is the initial observation, but "
+                f"the last memory state is {~term * 'non-'}terminal and {~trunc * 'non-'}truncated. "
+            )
 
-            term = self.terminations[self.last]
-            trunc = self.truncations[self.last]
-
-            if not (term or trunc):
-                raise InvalidMemoryState(
-                    f"No action was provided meaning this is the initial observation, but "
-                    f"the last memory state is {~term * 'non-'}terminal and {~trunc * 'non-'}truncated. "
-                )
-
-            if terminated or truncated:
-                warnings.warn(
-                    f"No action was provided meaning this is the initial observation, but"
-                    f"the new state is {~terminated * 'non-'}terminal and {~truncated * 'non-'}truncated. "
-                    f"Agent can't be terminated before it has been created!"
-                )
-        else:
-            action = self.action_encoder.prepare(action)
+        observation = self.observation_encoder.prepare(observation)
 
         self.last = (self.last + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
 
         # fmt: off
         self.observations[self.last] = observation
+        self.rewards     [self.last] = 0.
+        self.terminations[self.last] = False
+        self.truncations [self.last] = False
+        # fmt: on
+
+    def append_transition(
+            self,
+            new_observation,
+            action,
+            reward,
+            terminated,
+            truncated,
+    ) -> None:
+        new_observation = self.observation_encoder.prepare(new_observation)
+        action = self.action_encoder.prepare(action)
+
+        self.last = (self.last + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
+
+        # fmt: off
+        self.observations[self.last] = new_observation
         self.actions     [self.last] = action
         self.rewards     [self.last] = reward
         self.terminations[self.last] = terminated
         self.truncations [self.last] = truncated
         # fmt: on
 
-    def valid_indices(self):
+    def transition_indices(self):
         invalid = self.terminations | self.truncations
         invalid[self.last] = True
 
         indices, = torch.where(~invalid)
-        return indices
+        indices -= self.last - self.size + 1
+        return indices % self.capacity
 
-    def sample(self, batch_size: int):
-        indices = self.valid_indices()
+    def sample_transitions(self, batch_size: int):
+        indices = self.transition_indices()
         indices = indices[torch.randperm(len(indices))]  # randomize indices
         indices = indices[:batch_size]
 
@@ -110,28 +114,30 @@ class ReplayMemory:
             capacity,
         )
 
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def __bool__(self):
-        return len(self) > 0
+        return self.size > 0
 
     def __len__(self):
-        return len(self.valid_indices())
+        return self.size
 
     def __getitem__(self, item):
-        # TODO implement circular buffer indexing
-
-        # convert slices to indices
-        item = torch.arange(self.size)[item]
+        item = torch.arange(self.size)[item]  # convert slices to indices
+        item += self.last - self.size + 1
+        item %= self.capacity
         next_item = (item + 1) % self.capacity
 
-        # fmt: on
-        obs = self.observations[item]
-        action = self.actions[next_item]
-        reward = self.rewards[next_item]
-        terminations = self.terminations[next_item]
-        truncations = self.truncations[next_item]
-        new_obs = self.observations[next_item]
         # fmt: off
+        obs          = self.observations[item]
+        action       = self.actions[next_item]
+        reward       = self.rewards[next_item]
+        terminations = self.terminations[next_item]
+        truncations  = self.truncations[next_item]
+        new_obs      = self.observations[next_item]
+        # fmt: on
 
         return obs, action, reward, terminations, truncations, new_obs
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError  # TODO

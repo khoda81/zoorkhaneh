@@ -12,8 +12,8 @@ with open(NAMES_PATH) as f:
     NAMES = f.read().splitlines()
 
 
-class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
-    # TODO implement an api for switching the same agent between different environments
+class Agent(Generic[ActType, ObsType]):
+    # TODO write interface for switching the same agent between different environments
     def __init__(
             self,
             action_space: Space[ActType],
@@ -56,13 +56,13 @@ class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
 
     def remember_initial(self, observation: ObsType) -> None:
         """
-        Append the initial observation to the memory for training purposes.
+        Remember this initial observation for training purposes.
 
         Args:
             observation: The initial observation.
         """
 
-    def remember(
+    def remember_transition(
             self,
             new_observation: ObsType,
             action: ActType,
@@ -71,7 +71,7 @@ class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
             truncation: bool,
     ) -> None:
         """
-        Remember the action and the consequences. Data stored by this method should only be used for learning.
+        Remember this action and the consequences. Data stored by this method should only be used for learning.
         Agent state should be stored in object attributes and managed by `agent.act` and `agent.reset`.
 
         Args:
@@ -82,12 +82,6 @@ class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
             truncation: Whether the episode is truncated.
         """
 
-    # TODO maybe letting the agent manage the training process is not a good idea
-    # TODO i.e: the optimizer being in an invalid state after changing one of
-    # TODO the submodules manually
-    # TODO maybe the agent should just return the loss value and the training
-    # TODO should be done by the user
-    # TODO this would also allow for more flexibility in the training process
     def learn(self) -> float:
         """
         Perform one training step.
@@ -106,6 +100,9 @@ class Algorithm(Generic[ActType, ObsType]):  # TODO maybe inherit from nn.Module
     def __call__(self, obs: ObsType) -> ActType:
         """Call agent.act()"""
         return self.act(obs)
+
+    def __str__(self) -> str:
+        return self.name
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(name={self.name!r})'

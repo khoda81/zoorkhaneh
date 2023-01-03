@@ -7,7 +7,7 @@ import lovely_tensors as lt
 import torch
 import wandb
 
-from general_q.algorithms import DQN, Algorithm
+from general_q.agents import DQN, Agent
 from general_q.utils import evaluate, load_pretrained, save_pretrained
 
 lt.monkey_patch()
@@ -34,18 +34,19 @@ def train(wandb_project="general_q") -> None:
             save_pretrained(agent, SAVE_PATH)
 
     def log_to_wandb(step, length, loss, reward, *args, **kwargs):
-        wandb.log({
-            "step":   step,
-            "loss":   loss,
-            "reward": reward,
-            "length": length,
-        })
+        pass
+    #     wandb.log({
+    #         "step":   step,
+    #         "loss":   loss,
+    #         "reward": reward,
+    #         "length": length,
+    #     })
 
-    wandb.init(
-        project=wandb_project,
-        dir=SAVE_PATH.parent,
-        name=str(agent),
-    )
+    # wandb.init(
+    #     project=wandb_project,
+    #     dir=SAVE_PATH.parent,
+    #     name=str(agent),
+    # )
 
     with env, agent:
         evaluate(
@@ -88,7 +89,7 @@ def create_env():
     return env
 
 
-def load_agent(path, env: gymnasium.Env) -> Optional[Algorithm]:
+def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
     path = Path(path)
 
     if not path.exists():
@@ -100,7 +101,7 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Algorithm]:
         if agent is None:
             continue
 
-        agent: Algorithm
+        agent: Agent
         if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
             continue
 
@@ -111,10 +112,11 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Algorithm]:
     return best_agent
 
 
-def create_agent(env: gymnasium.Env) -> Algorithm:
+def create_agent(env: gymnasium.Env) -> Agent:
     return DQN(
         action_space=env.action_space,
         observation_space=env.observation_space,
+        memory_capacity=1024,
     )
 
 

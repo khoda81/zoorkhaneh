@@ -9,12 +9,12 @@ from gymnasium.core import ActType, ObsType
 from torch import nn, optim
 from torch.nn import functional as F
 
-from general_q.algorithms.base import Algorithm
-from general_q.algorithms.replay_memory import ReplayMemory
+from general_q.agents.base import Agent
+from general_q.agents.replay_memory import ReplayMemory
 from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 
 
-class DQN(Algorithm, nn.Module):
+class DQN(Agent, nn.Module):
     def __init__(
             self,
             action_space: Space[ActType],
@@ -31,7 +31,7 @@ class DQN(Algorithm, nn.Module):
             epsilon: float = 5e-1,
             epsilon_decay: float = -7.0,
             gamma: float = 4.0,
-            replay_memory_size: int = 2**16,
+            memory_capacity: int = 2**16,
     ) -> None:
         """
         Args:
@@ -95,7 +95,7 @@ class DQN(Algorithm, nn.Module):
         self.gameplays = ReplayMemory(
             action_encoder=self.action_encoder,
             observation_encoder=self.observation_encoder,
-            capacity=replay_memory_size,
+            capacity=memory_capacity,
         )
 
     @torch.no_grad()
@@ -115,23 +115,10 @@ class DQN(Algorithm, nn.Module):
         return self.action_encoder.unprepare(actions[action_index])
 
     def remember_initial(self, observation: ObsType) -> None:
-        self.gameplays.append(observation)
+        self.gameplays.append_initial(observation)
 
-    def remember_transition(
-            self,
-            new_observation,
-            action,
-            reward,
-            termination,
-            truncation,
-    ) -> None:
-        self.gameplays.append(
-            new_observation,
-            action,
-            reward,
-            termination,
-            truncation,
-        )
+    def remember_transition(self, new_observation, action, reward, termination, truncation) -> None:
+        self.gameplays.append_transition(new_observation, action, reward, termination, truncation)
 
     def learn(self, batch_size=128) -> float:
         """
@@ -156,7 +143,7 @@ class DQN(Algorithm, nn.Module):
             terminations,
             truncations,
             next_observations,
-        ) = self.gameplays.sample(batch_size)
+        ) = self.gameplays.sample_transitions(batch_size)
 
         loss = self.calculate_loss(
             observations,

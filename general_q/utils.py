@@ -7,12 +7,12 @@ from pathlib import Path
 from gymnasium import Env
 from tqdm import tqdm, trange
 
-from general_q.algorithms import Algorithm
+from general_q.agents import Agent
 
 
 def evaluate(
         env: Env,
-        agent: Algorithm,
+        agent: Agent,
         steps: int,
         train: bool = True,
         step_callback: callable = None,
@@ -96,7 +96,7 @@ def evaluate(
 
 
 def save_pretrained(
-    agent: Algorithm,
+    agent: Agent,
     path: Union[str, Path],
     raise_error: bool = True,
 ):
@@ -124,7 +124,7 @@ def save_pretrained(
 def load_pretrained(
         path: Union[str, Path],
         raise_error: bool = True,
-) -> Optional[Algorithm]:
+) -> Optional[Agent]:
     """
     Try to load the agent from the given path.
 

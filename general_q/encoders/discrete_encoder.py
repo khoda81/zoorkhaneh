@@ -30,3 +30,6 @@ class DiscreteEncoder(TensorEncoder[int]):
 
     def unprepare(self, sample: TensorStorage) -> int:
         return sample.data.item()
+
+    def sample(self, batch_shape):
+        return self.prepare(torch.randint(self.space.n, batch_shape))

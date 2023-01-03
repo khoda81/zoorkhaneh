@@ -10,7 +10,7 @@ from general_q.encoders.tensor_encoder import TensorEncoder
 
 class ImageEncoder(TensorEncoder):
     def make_encoder(self, embed_dim):
-        # TODO implement a more robust to size encoder, maybe a Vision Transformer?
+        # TODO implement a more robust to size encoder, maybe a pretrained ViT?
         self.encoder = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3),
             nn.MaxPool2d(2),
@@ -62,12 +62,16 @@ class ImageEncoder(TensorEncoder):
         sample.data = sample.data.transpose(-1, -3).transpose(-1, -2)
         return sample
 
-    def forward(self, sample: TensorStorage) -> torch.Tensor:
-        # we normalize only when forwarding to save memory
-        # floats more than 4x the space of uint8s
-        sample = sample.transform(lambda x: x / 255 - .5)
-        return super().forward(sample)
-
     def unprepare(self, sample: TensorStorage) -> NDArray:
         # [*b, c, h, w] -> [*b, c, w, h] -> [*b, h, w, c]
         return super().unprepare(sample).transpose(-1, -2).transpose(-1, -3)
+
+    def sample(self, batch_shape=(), *args, **kwargs) -> TensorStorage:
+        h, w, c = self.space.shape
+        return super().prepare(torch.randint(0, 255, batch_shape + (c, h, w)))
+
+    def forward(self, sample: TensorStorage) -> torch.Tensor:
+        # we normalize only when forwarding to save memory
+        # floats take more than 4x the space of uint8s
+        sample = sample.apply(lambda x: x / 255 - .5)
+        return super().forward(sample)
