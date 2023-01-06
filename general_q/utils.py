@@ -1,10 +1,12 @@
 from typing import Optional, Union
 
+import math
 import pickle
+import time
 from itertools import count
 from pathlib import Path
 
-from gymnasium import Env
+from gymnasium import Env, ObservationWrapper, spaces
 from tqdm import tqdm, trange
 
 from general_q.agents import Agent
@@ -144,3 +146,31 @@ def load_pretrained(
     except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
         if raise_error:
             raise pickle.UnpicklingError(f"Error loading agent from {path}") from e
+
+
+class WallTimeObserver(ObservationWrapper):
+    """
+    An observation wrapper that adds wall-time to the observation.
+    """
+
+    def __init__(self, env: Env, base=256):
+        super().__init__(env)
+        self.n = math.ceil(math.log(time.time(), base)) + 1
+        self.observation_space = spaces.Dict({
+            "observation": env.observation_space,
+            "time": spaces.Box(low=0, high=1, shape=(self.n,), dtype=float),
+        })
+        self.base = base
+
+    def observation(self, observation) -> dict:
+        remainder = time.time()
+        time_obs = []
+        for _ in range(self.n):
+            remainder, division = divmod(remainder, 1)
+            remainder /= self.base
+            time_obs.append(division)
+
+        return {
+            "observation": observation,
+            "time": time_obs,
+        }

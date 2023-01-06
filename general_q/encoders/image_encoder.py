@@ -70,8 +70,8 @@ class ImageEncoder(TensorEncoder):
         return super().unprepare(sample).transpose(-1, -2).transpose(-1, -3)
 
     def sample(self, batch_shape=()) -> TensorStorage:
-        h, w, c = self.space.shape
-        data = torch.randint(0, 255, batch_shape + (c, h, w), dtype=self.dtype, device=self.device)
+        shape = (*batch_shape, *self.space.shape)
+        data = torch.randint(0, 255, shape, dtype=self.dtype, device=self.device)
         return self.prepare(data)
 
     def forward(self, sample: TensorStorage) -> torch.Tensor:

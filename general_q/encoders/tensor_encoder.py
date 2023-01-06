@@ -26,6 +26,9 @@ class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
         super().__init__(space)
         sample = torch.tensor(space.sample())
         self.dtype = sample.dtype
+        if self.dtype in [torch.float64, torch.float16]:
+            self.dtype = torch.float32
+
         # TODO remove assert after done with testing
         assert sample.shape == self.space.shape, \
             f"Sample's shape={tuple(sample.shape)} does not match expected shape: " \
@@ -36,8 +39,8 @@ class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
             self.encoder = self.make_encoder(embed_dim, *args, **kwargs)
 
     def make_encoder(self, *args, **kwargs) -> nn.Module:
-        raise NotImplementedError("If you don't need a neural network, "
-                                  "set embed_dim=None in the constructor")
+        raise NotImplementedError("If you don't need to make a neural network, "
+                                  "pass embed_dim=None to the constructor")
 
     def prepare(self, sample: I) -> TensorStorage:
         if isinstance(sample, torch.Tensor):

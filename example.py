@@ -7,7 +7,12 @@ import lovely_tensors as lt
 import wandb
 
 from general_q.agents import DQN, Agent
-from general_q.utils import evaluate, load_pretrained, save_pretrained
+from general_q.utils import (
+    WallTimeObserver,
+    evaluate,
+    load_pretrained,
+    save_pretrained,
+)
 
 lt.monkey_patch()
 lt.set_config(precision=4, sci_mode=False)
@@ -17,8 +22,8 @@ SAVE_PATH = Path("tmp/pretrained")
 
 def train(wandb_project="general_q") -> None:
     env = create_env()
-    agent = load_agent(SAVE_PATH, env) or create_agent(env)
     # agent = create_agent(env)
+    agent = load_agent(SAVE_PATH, env) or create_agent(env)
 
     print("Training:")
     print(f"\tAgent: {agent}")
@@ -75,6 +80,8 @@ def create_env():
         # continuous=False,
     )
 
+    env = WallTimeObserver(env)
+
     return env
 
 
@@ -90,7 +97,6 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
         if agent is None:
             continue
 
-        # agent: Agent
         if (
             agent.action_space != env.action_space
         ) or (
@@ -109,7 +115,6 @@ def create_agent(env: gymnasium.Env) -> Agent:
     return DQN(
         action_space=env.action_space,
         observation_space=env.observation_space,
-        memory_capacity=1024,
     )
 
 
