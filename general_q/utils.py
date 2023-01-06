@@ -53,14 +53,14 @@ def evaluate(
             with tqdm(count(1), leave=False, total=max_step) as episode_pbar:
                 for episode_step in episode_pbar:
                     action = agent(observation)
-                    observation, reward, termination, truncation, info = env.step(action)
+                    observation, reward, terminated, truncated, info = env.step(action)
 
                     step_callback(
                         observation=observation,
                         action=action,
                         reward=reward,
-                        termination=termination,
-                        truncation=truncation,
+                        terminated=terminated,
+                        truncated=truncated,
                         info=info,
                         step=step_pbar.n,
                     )
@@ -69,7 +69,7 @@ def evaluate(
 
                     description = ""
                     if train:
-                        agent.remember_transition(observation, action, reward, termination, truncation)
+                        agent.remember_transition(observation, action, reward, terminated, truncated)
 
                         loss = agent.learn()
                         description += f"{loss=:7.3f}, "
@@ -82,7 +82,7 @@ def evaluate(
                     if step_pbar.n >= steps:
                         return
 
-                    if termination or truncation:
+                    if terminated or truncated:
                         break
 
             episode_callback(

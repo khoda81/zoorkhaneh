@@ -67,8 +67,8 @@ class Agent(Generic[ActType, ObsType]):
             new_observation: ObsType,
             action: ActType,
             reward: float,
-            termination: bool,
-            truncation: bool,
+            terminated: bool,
+            truncated: bool,
     ) -> None:
         """
         Remember this action and the consequences. Data stored by this method should only be used for learning.
@@ -78,8 +78,8 @@ class Agent(Generic[ActType, ObsType]):
             new_observation: The observation after the action.
             action: The action taken.
             reward: The reward received.
-            termination: Whether the episode is done.
-            truncation: Whether the episode is truncated.
+            terminated: Whether the episode is done.
+            truncated: Whether the episode is truncated.
         """
 
     def learn(self) -> float:

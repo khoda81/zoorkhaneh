@@ -2,6 +2,9 @@ from typing import Any, Callable
 
 from abc import abstractmethod, abstractproperty
 from collections import OrderedDict
+from collections.abc import Hashable
+
+import torch
 
 
 class Storage:
@@ -31,7 +34,7 @@ class Storage:
 
 
 class TensorStorage(Storage):
-    def __init__(self, data):
+    def __init__(self, data: torch.Tensor):
         self.data = data
 
     @property
@@ -54,20 +57,25 @@ class TensorStorage(Storage):
         return self.data.__repr__()
 
 
-def dzip(*mappings, collect=tuple):
-    keys = set()
+def dzip(*mappings, keys=None, collect=tuple):
+    if not mappings:
+        if keys is not None:
+            yield from (
+                (key, collect(iter(())))
+                for key in keys
+            )
 
-    for mapping in mappings:
-        for key in mapping:
-            if key in keys:
-                continue
+        return
 
-            yield key, collect(mapping[key] for mapping in mappings)
-            keys.add(key)
+    if keys is None:
+        keys = mappings[0]
+
+    for key in keys:
+        yield key, collect(mapping[key] for mapping in mappings)
 
 
 class MapStorage(Storage):
-    map: OrderedDict[Any, Storage]
+    map: OrderedDict[Hashable, Storage]
 
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -93,7 +101,7 @@ class MapStorage(Storage):
         )
 
     def __setitem__(self, item, value: "MapStorage"):
-        for _, (v1, v2) in dzip(self.map, value.map):
+        for _, (v1, v2) in dzip(self.map, value.map, keys=value.map):
             v1[item] = v2
 
     def __delitem__(self, item):

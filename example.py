@@ -34,19 +34,18 @@ def train(wandb_project="general_q") -> None:
             save_pretrained(agent, SAVE_PATH)
 
     def log_to_wandb(step, length, loss, reward, *args, **kwargs):
-        pass
-    #     wandb.log({
-    #         "step":   step,
-    #         "loss":   loss,
-    #         "reward": reward,
-    #         "length": length,
-    #     })
+        wandb.log({
+            "step"  : step,
+            "loss"  : loss,
+            "reward": reward,
+            "length": length,
+        })
 
-    # wandb.init(
-    #     project=wandb_project,
-    #     dir=SAVE_PATH.parent,
-    #     name=str(agent),
-    # )
+    wandb.init(
+        project=wandb_project,
+        dir=SAVE_PATH.parent,
+        name=str(agent),
+    )
 
     with env, agent:
         evaluate(
@@ -60,6 +59,7 @@ def train(wandb_project="general_q") -> None:
 
     save_pretrained(agent, SAVE_PATH)
 
+
 def create_env():
     env = gymnasium.make(
         # id="Acrobot-v1",
@@ -72,19 +72,10 @@ def create_env():
         # id="MountainCarContinuous-v01",
         # id="Pendulum-v1",
 
-        render_mode="human",
-        # render_mode=None,
+        # render_mode="human",
 
         # continuous=False,
     )
-
-    # env = gymnasium.wrappers.TransformReward(
-    #     env,
-    #     lambda r: 1e-1 * r,
-    #     # lambda r: 1e-2 * r,
-    #     # lambda r: 1e-3 * r,
-    #     # lambda r: 1e-4 * r,
-    # )
 
     return env
 
@@ -101,8 +92,12 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
         if agent is None:
             continue
 
-        agent: Agent
-        if (agent.action_space, agent.observation_space) != (env.action_space, env.observation_space):
+        # agent: Agent
+        if (
+            agent.action_space != env.action_space
+        ) or (
+            agent.observation_space != env.observation_space
+        ):
             continue
 
         modify_time = path.stat().st_mtime
