@@ -41,7 +41,7 @@ class ReplayMemory:
         self.size          = 0
 
     def to(self, device: torch.device):
-        self.storage.transform(lambda tensor: tensor.to(device))
+        self.storage = self.storage.transformed(lambda tensor: tensor.to(device))
         self.encoder.to(device)
 
     def append_initial(self, new_observation) -> None:

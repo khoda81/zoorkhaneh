@@ -2,6 +2,7 @@ from typing import Optional
 
 import math
 import random
+from itertools import chain
 
 import torch
 from gymnasium import Space
@@ -15,7 +16,7 @@ from general_q.encoders import DiscreteEncoder, Encoder, auto_encoder
 from general_q.encoders.storage import MapStorage
 
 
-class DQN(Agent, nn.Module):
+class DQN(Agent):
     def __init__(
             self,
             action_space: Space[ActType],
@@ -56,9 +57,8 @@ class DQN(Agent, nn.Module):
         self.epsilon_decay = epsilon_decay
         self.gamma = gamma
 
-        self.q_model = q_model
-        if self.q_model is None:
-            self.q_model = nn.Sequential(
+        if q_model is None:
+            q_model = nn.Sequential(
                 nn.Linear(embed_dim, embed_dim),
                 nn.GELU(),
                 nn.Linear(embed_dim, embed_dim),
@@ -71,9 +71,8 @@ class DQN(Agent, nn.Module):
                 nn.Flatten(-2),
             )
 
-        # TODO move encoders to the q module to add more flexibility and
-        # TODO manage unintended side effects of changing encoders and q model
-        # TODO after initialization
+        self.q_model = q_model
+
         self.action_encoder = action_encoder(action_space, embed_dim)
         assert isinstance(self.action_encoder, Encoder), \
             f"{self.action_encoder} should inherit from {Encoder}"
@@ -83,7 +82,11 @@ class DQN(Agent, nn.Module):
             f"{self.observation_encoder} should inherit from {Encoder}"
 
         self.optimizer = optim.Adam(
-            self.parameters(),
+            chain(
+                self.q_model.parameters(),
+                self.observation_encoder.parameters(),
+                self.action_encoder.parameters(),
+            ),
             lr=lr,
             betas=(0.9, 0.999),
             eps=1e-08,
@@ -150,8 +153,6 @@ class DQN(Agent, nn.Module):
         """
         Sample a batch of transitions from the replay memory.
         """
-        # TODO move this conversion to ReplayMemory
-
         terminal = self.gameplays.storage.map["terminated"].data | self.gameplays.storage.map["truncated"].data
         terminal[self.gameplays.last] = True
         last_indices, = torch.where(~terminal)
@@ -198,6 +199,25 @@ class DQN(Agent, nn.Module):
 
     def update_epsilon(self):
         self.epsilon /= 1 + math.exp(self.epsilon_decay)
+
+    def to(self, device: torch.device):
+        self.q_model.to(device)
+        self.observation_encoder.to(device)
+        self.action_encoder.to(device)
+        self.gameplays.to(device)
+        for param in self.optimizer.state.values():
+            # Not sure there are any global tensors in the state dict
+            if isinstance(param, torch.Tensor):
+                param.data = param.data.to(device)
+                if param._grad is not None:
+                    param._grad.data = param._grad.data.to(device)
+
+            elif isinstance(param, dict):
+                for subparam in param.values():
+                    if isinstance(subparam, torch.Tensor):
+                        subparam.data = subparam.data.to(device)
+                        if subparam._grad is not None:
+                            subparam._grad.data = subparam._grad.data.to(device)
 
     def set_lr(self, lr):
         for param_group in self.optimizer.param_groups:

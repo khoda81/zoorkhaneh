@@ -9,7 +9,7 @@ import torch
 
 class Storage:
     @abstractmethod
-    def apply(self, transform: Callable[[Any], Any]) -> "Storage":
+    def transformed(self, transform: Callable[[Any], Any]) -> "Storage":
         pass
 
     @abstractproperty
@@ -41,7 +41,7 @@ class TensorStorage(Storage):
     def shape(self):
         return self.data.shape
 
-    def apply(self, transform):
+    def transformed(self, transform):
         return self.__class__(transform(self.data))
 
     def __getitem__(self, item):
@@ -81,9 +81,9 @@ class MapStorage(Storage):
         super().__init__()
         self.map = OrderedDict(*args, **kwargs)
 
-    def apply(self, transform):
+    def transformed(self, transform):
         return self.__class__(
-            (k, v.apply(transform))
+            (k, v.transformed(transform))
             for k, v in self.map.items()
         )
 
@@ -124,8 +124,8 @@ class TupleStorage(Storage):
         super().__init__()
         self.items = tuple(data)
 
-    def apply(self, transform):
-        return self.__class__(v.apply(transform) for v in self.items)
+    def transformed(self, transform):
+        return self.__class__(v.transformed(transform) for v in self.items)
 
     @property
     def shape(self):

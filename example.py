@@ -4,7 +4,6 @@ from pathlib import Path
 
 import gymnasium
 import lovely_tensors as lt
-import torch
 import wandb
 
 from general_q.agents import DQN, Agent
@@ -12,7 +11,6 @@ from general_q.utils import evaluate, load_pretrained, save_pretrained
 
 lt.monkey_patch()
 lt.set_config(precision=4, sci_mode=False)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 SAVE_PATH = Path("tmp/pretrained")
 
@@ -72,7 +70,7 @@ def create_env():
         # id="MountainCarContinuous-v01",
         # id="Pendulum-v1",
 
-        # render_mode="human",
+        render_mode="human",
 
         # continuous=False,
     )

@@ -79,5 +79,5 @@ class ImageEncoder(TensorEncoder):
 
         # we normalize only when forwarding to save memory
         # floats take more than 4x the space of uint8s
-        sample = sample.apply(lambda x: x / 255 - .5)
+        sample = sample.transformed(lambda x: x / 255 - .5)
         return super().forward(sample)
