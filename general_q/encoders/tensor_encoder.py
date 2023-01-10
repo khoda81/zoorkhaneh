@@ -29,12 +29,6 @@ class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
         if self.dtype in [torch.float64, torch.float16]:
             self.dtype = torch.float32
 
-        # TODO remove assert after done with testing
-        assert sample.shape == self.space.shape, \
-            f"Sample's shape={tuple(sample.shape)} does not match expected shape: " \
-            f"space.shape={', '.join(map(str, self.space.shape))}, " \
-            f"space={space}"
-
         if embed_dim is not None:
             self.encoder = self.make_encoder(embed_dim, *args, **kwargs)
 

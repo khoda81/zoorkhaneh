@@ -37,7 +37,7 @@ class Agent(Generic[ActType, ObsType]):
         self.observation_space = observation_space
         self.name = name
 
-    def act(self, obs: ObsType) -> ActType:
+    def act(self, observation: ObsType) -> ActType:
         """
         Act based on the observation.
 
@@ -64,32 +64,32 @@ class Agent(Generic[ActType, ObsType]):
 
     def remember_transition(
             self,
-            new_observation: ObsType,
             action: ActType,
             reward: float,
             terminated: bool,
             truncated: bool,
+            new_observation: ObsType,
     ) -> None:
         """
         Remember this action and the consequences. Data stored by this method should only be used for learning.
         Agent state should be stored in object attributes and managed by `agent.act` and `agent.reset`.
 
         Args:
-            new_observation: The observation after the action.
             action: The action taken.
             reward: The reward received.
             terminated: Whether the episode is done.
             truncated: Whether the episode is truncated.
+            new_observation: The observation after the action.
         """
 
-    def learn(self) -> float:
+    def learn(self, *args, **kwargs) -> dict:
         """
         Perform one training step.
 
         Returns:
-            The loss value.
+            A dictionary of metrics and info about training.
         """
-        return 0.0
+        return {}
 
     def __enter__(self):
         return self

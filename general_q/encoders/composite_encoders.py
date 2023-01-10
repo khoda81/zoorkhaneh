@@ -45,7 +45,6 @@ class DictEncoder(Encoder, nn.ModuleDict):
         return torch.cat(encoded, dim=-2)
 
 
-# TODO map TupleEncoder to DictEncoder
 class TupleEncoder(Encoder, nn.ModuleList):
     space: spaces.Tuple
 
@@ -61,7 +60,7 @@ class TupleEncoder(Encoder, nn.ModuleList):
             encoder = subencoder(
                 space=space,
                 embed_dim=embed_dim,
-                *args, **kwargs
+                *args, **kwargs,
             )
 
             assert isinstance(encoder, Encoder), \

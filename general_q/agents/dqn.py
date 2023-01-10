@@ -82,16 +82,12 @@ class DQN(Agent):
             f"{self.observation_encoder} should inherit from {Encoder}"
 
         self.optimizer = optim.Adam(
-            chain(
+            params=chain(
                 self.q_model.parameters(),
                 self.observation_encoder.parameters(),
                 self.action_encoder.parameters(),
             ),
             lr=lr,
-            betas=(0.9, 0.999),
-            eps=1e-08,
-            weight_decay=0,
-            amsgrad=False,
         )
 
         self.gameplays = ReplayMemory(
@@ -122,10 +118,10 @@ class DQN(Agent):
     def remember_initial(self, observation: ObsType) -> None:
         self.gameplays.append_initial(observation)
 
-    def remember_transition(self, new_observation, action, reward, terminated, truncated) -> None:
-        self.gameplays.append_transition(new_observation, action, reward, terminated, truncated)
+    def remember_transition(self, action, reward, terminated, truncated, new_observation) -> None:
+        self.gameplays.append_transition(action, reward, terminated, truncated, new_observation)
 
-    def learn(self, batch_size=128) -> float:
+    def learn(self, batch_size=128) -> dict[str, torch.Tensor]:
         """
         Learn from the gameplays.
 
@@ -147,7 +143,7 @@ class DQN(Agent):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        return loss.item()
+        return {"loss": loss}
 
     def sample_transitions(self, batch_size: int) -> MapStorage:
         """
@@ -173,10 +169,13 @@ class DQN(Agent):
         """
         Calculate the loss value for this specified transitions
         """
-        observation          = self.observation_encoder(sample.map["observation"])      # [batch_size, s, emb]
-        action               = self.action_encoder(sample.map["action"])                # [batch_size, s, emb]
-        new_observation      = self.observation_encoder(sample.map["new_observation"])  # [batch_size, s, emb]
-        _, action_embeddings = self.action_encoder.all()                            # [n, s, emb]
+        observation          = sample.map["observation"]                  # [batch_size]
+        observation          = self.observation_encoder(observation)      # [batch_size, s, emb]
+        action               = sample.map["action"]                       # [batch_size]
+        action               = self.action_encoder(action)                # [batch_size, s, emb]
+        new_observation      = sample.map["new_observation"]              # [batch_size]
+        new_observation      = self.observation_encoder(new_observation)  # [batch_size, s, emb]
+        _, action_embeddings = self.action_encoder.all()                  # [n, s, emb]
 
         new_observation   = new_observation.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
         action_embeddings = action_embeddings.sum(dim=-2)                      # [n, emb]

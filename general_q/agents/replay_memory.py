@@ -20,16 +20,15 @@ class ReplayMemory:
             ),
     ):
         # TODO stop allocating all memory at once, implement dynamic list
-        # TODO remove device
         self.observation_space = observation_space
         self.action_space = action_space
 
         space = spaces.Dict(
-            new_observation=observation_space,
             action=action_space,
             reward=spaces.Box(low=-float("inf"), high=float("inf"), shape=()),
             terminated=spaces.Box(low=0, high=1, shape=(), dtype=bool),
             truncated=spaces.Box(low=0, high=1, shape=(), dtype=bool),
+            new_observation=observation_space,
         )
 
         self.encoder = DictEncoder(space, subencoder=auto_encoder, embed_dim=None).to(device)
@@ -46,10 +45,10 @@ class ReplayMemory:
 
     def append_initial(self, new_observation) -> None:
         state = self.encoder.prepare({
-            "new_observation": new_observation,
             "reward"         : 0.,
             "terminated"     : False,
             "truncated"      : False,
+            "new_observation": new_observation,
         })
 
         if self.auto_truncate:
@@ -70,18 +69,18 @@ class ReplayMemory:
 
     def append_transition(
             self,
-            new_observation,
             action,
             reward,
             terminated,
             truncated,
+            new_observation,
     ) -> None:
         transition = self.encoder.prepare({
-            "new_observation": new_observation,
             "action"         : action,
             "reward"         : reward,
             "terminated"     : terminated,
             "truncated"      : truncated,
+            "new_observation": new_observation,
         })
 
         self.last = (self.last + 1) % self.capacity

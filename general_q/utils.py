@@ -32,10 +32,10 @@ def evaluate(
         episode_callback: A callback to call after each episode.
     """
     if episode_callback is None:
-        episode_callback = lambda *_, **__: None
+        episode_callback = lambda **_: None
 
     if step_callback is None:
-        step_callback = lambda *_, **__: None
+        step_callback = lambda **_: None
 
     try:
         max_step = env.spec.max_episode_steps
@@ -44,40 +44,49 @@ def evaluate(
 
     with trange(steps) as step_pbar:
         while True:
-            observation, info = env.reset()
+            log_info = {}
+
+            observation, log_info["env"] = env.reset()
             agent.reset()
+
+            step_callback(
+                observation=observation,
+                log_info=log_info,
+                step=step_pbar.n,
+            )
 
             if train:
                 agent.remember_initial(observation)
 
-            acc_rew = 0
-            eps_loss = 0
+            episode_reward = 0
             with tqdm(count(1), leave=False, total=max_step) as episode_pbar:
                 for episode_step in episode_pbar:
                     action = agent(observation)
-                    observation, reward, terminated, truncated, info = env.step(action)
+                    log_info = {}
+                    observation, reward, terminated, truncated, log_info["env"] = env.step(action)
 
-                    step_callback(
-                        observation=observation,
-                        action=action,
-                        reward=reward,
-                        terminated=terminated,
-                        truncated=truncated,
-                        info=info,
-                        step=step_pbar.n,
-                    )
-
-                    acc_rew += reward
+                    episode_reward += reward
 
                     description = ""
                     if train:
-                        agent.remember_transition(observation, action, reward, terminated, truncated)
+                        agent.remember_transition(action, observation, reward, terminated, truncated)
+                        log_info["train"] = agent.learn()
 
-                        loss = agent.learn()
-                        description += f"{loss=:7.3f}, "
-                        eps_loss += loss
+                        if "loss" in log_info["train"]:
+                            loss = float(log_info["train"]["loss"])
+                            description += f"{loss=:7.3f}, "
 
-                    description += f"{reward=:6.2f}, {acc_rew=:6.2f}"
+                    step_callback(
+                        action=action,
+                        observation=observation,
+                        reward=reward,
+                        terminated=terminated,
+                        truncated=truncated,
+                        log_info=log_info,
+                        step=step_pbar.n,
+                    )
+
+                    description += f"{reward=:6.2f}, {episode_reward=:6.2f}"
                     episode_pbar.set_description(description)
                     step_pbar.update()
 
@@ -88,13 +97,12 @@ def evaluate(
                         break
 
             episode_callback(
-                step=step_pbar.n,
                 length=episode_step,
-                loss=eps_loss / episode_step,
-                reward=acc_rew,
+                episode_reward=episode_reward,
+                step=step_pbar.n,
             )
 
-            step_pbar.set_description(f"last_acc_reward={acc_rew:6.2f}")
+            step_pbar.set_description(f"{episode_reward=:6.2f}")
 
 
 def save_pretrained(

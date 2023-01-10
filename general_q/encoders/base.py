@@ -64,9 +64,6 @@ class Encoder(nn.Module, ABC, Generic[I, B]):
             batch_shape: Shape of the sample batch.
         """
 
-    # TODO add empty() method or an argument to sample, for empty samples
-    # TODO useful when we need a dummy sample and sample is too slow for it
-
     @abstractmethod
     def forward(self, sample: B) -> torch.FloatTensor:
         """

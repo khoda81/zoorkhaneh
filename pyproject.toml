@@ -16,17 +16,18 @@ license = "MIT"
 repository = "https://github.com/khoda81/general-q"
 homepage = "https://github.com/khoda81/general-q"
 
-# Keywords description https://python-poetry.org/docs/pyproject/#keywords
-keywords = []  #! Update me
+keywords = ["Reinforcement Learning", "RL", "AI", "general_q"]
 
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
-    "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
+    'Intended Audience :: Science/Research',
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
 
 

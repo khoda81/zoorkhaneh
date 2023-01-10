@@ -32,17 +32,22 @@ def train(wandb_project="general_q") -> None:
     except AttributeError:
         print(f"\tEnv:   {env.unwrapped!s}")
 
-    def save_agent(step, *args, **kwargs):
+    def step_callback(step, log_info, **kwargs):
+        log_info = {
+            '.'.join(k): v
+            for k, v in flatten_dict(log_info)
+        }
+
+        wandb.log({
+            "step": step,
+            **log_info,
+        })
+
         if (step + 1) % 2000 == 0:
             save_pretrained(agent, SAVE_PATH)
 
-    def log_to_wandb(step, length, loss, reward, *args, **kwargs):
-        wandb.log({
-            "step"  : step,
-            "loss"  : loss,
-            "reward": reward,
-            "length": length,
-        })
+    def episode_callback(**kwargs):
+        wandb.log(kwargs)
 
     wandb.init(
         project=wandb_project,
@@ -54,13 +59,20 @@ def train(wandb_project="general_q") -> None:
         evaluate(
             env,
             agent,
-            steps=1_000_000,
+            steps=10_000,
             train=True,
-            step_callback=save_agent,
-            episode_callback=log_to_wandb,
+            step_callback=step_callback,
+            episode_callback=episode_callback,
         )
 
     save_pretrained(agent, SAVE_PATH)
+
+
+def create_agent(env: gymnasium.Env) -> Agent:
+    return DQN(
+        action_space=env.action_space,
+        observation_space=env.observation_space,
+    )
 
 
 def create_env():
@@ -111,11 +123,16 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
     return best_agent
 
 
-def create_agent(env: gymnasium.Env) -> Agent:
-    return DQN(
-        action_space=env.action_space,
-        observation_space=env.observation_space,
-    )
+from collections.abc import Mapping
+
+
+def flatten_dict(d: Mapping, parent_key: tuple = ()):
+    for k, v in d.items():
+        new_key = parent_key + (k,)
+        if isinstance(v, Mapping):
+            yield from flatten_dict(v, new_key)
+        else:
+            yield new_key, v
 
 
 if __name__ == "__main__":
