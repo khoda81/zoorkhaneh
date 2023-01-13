@@ -69,7 +69,13 @@ def evaluate(
 
                     description = ""
                     if train:
-                        agent.remember_transition(action, observation, reward, terminated, truncated)
+                        agent.remember_transition(
+                            action,
+                            reward,
+                            terminated,
+                            truncated,
+                            observation,
+                        )
                         log_info["train"] = agent.learn()
 
                         if "loss" in log_info["train"]:
@@ -163,20 +169,19 @@ class WallTimeObserver(ObservationWrapper):
 
     def __init__(self, env: Env, base=256):
         super().__init__(env)
+        self.base = base
         self.n = math.ceil(math.log(time.time(), base)) + 1
         self.observation_space = spaces.Dict({
             "observation": env.observation_space,
             "time": spaces.Box(low=0, high=1, shape=(self.n,), dtype=float),
         })
-        self.base = base
 
     def observation(self, observation) -> dict:
         remainder = time.time()
         time_obs = []
         for _ in range(self.n):
-            remainder, division = divmod(remainder, 1)
+            time_obs.append(remainder % 1)
             remainder /= self.base
-            time_obs.append(division)
 
         return {
             "observation": observation,

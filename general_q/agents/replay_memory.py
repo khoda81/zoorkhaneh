@@ -33,6 +33,7 @@ class ReplayMemory:
 
         self.encoder = DictEncoder(space, subencoder=auto_encoder, embed_dim=None).to(device)
         self.storage = self.encoder.sample([capacity])
+        self.storage.map["truncated"].data[:] = True
 
         self.auto_truncate = auto_truncate
         self.capacity      = capacity

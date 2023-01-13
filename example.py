@@ -84,7 +84,7 @@ def create_env():
         id="CartPole-v1",
         # id="CliffWalking-v0",
         # id="LunarLander-v2",
-        # id="MountainCarContinuous-v01",
+        # id="MountainCarContinuous-v0",
         # id="Pendulum-v1",
 
         render_mode="human",
