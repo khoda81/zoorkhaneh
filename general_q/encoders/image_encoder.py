@@ -59,9 +59,11 @@ class ImageEncoder(TensorEncoder):
     def prepare(self, sample):
         sample = super().prepare(sample)
         # [*b, h*w*c] -> [*b, c, w, h] -> [*b, c, h, w]
-        sample.data = sample.data \
-            .reshape(sample.shape[:-1] + self.space.shape) \
-            .transpose(-1, -3).transpose(-1, -2)
+        sample.data = (
+            sample.data.reshape(sample.shape[:-1] + self.space.shape)
+            .transpose(-1, -3)
+            .transpose(-1, -2)
+        )
 
         return sample
 
@@ -71,7 +73,11 @@ class ImageEncoder(TensorEncoder):
 
     def sample(self, batch_shape=()) -> TensorStorage:
         shape = (*batch_shape, *self.space.shape)
-        data = torch.randint(0, 255, shape, dtype=self.dtype, device=self.device)
+        data = torch.randint(0,
+                             255,
+                             shape,
+                             dtype=self.dtype,
+                             device=self.device)
         return self.prepare(data)
 
     def forward(self, sample: TensorStorage) -> torch.Tensor:
@@ -79,5 +85,5 @@ class ImageEncoder(TensorEncoder):
 
         # we normalize only when forwarding to save memory
         # floats take more than 4x the space of uint8s
-        sample = sample.transformed(lambda x: x / 255 - .5)
+        sample = sample.transformed(lambda x: x / 255 - 0.5)
         return super().forward(sample)

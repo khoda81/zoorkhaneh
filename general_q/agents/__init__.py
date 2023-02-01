@@ -6,8 +6,8 @@ from general_q.agents.replay_memory import ReplayMemory
 # TODO maybe a Human agent to record human gameplays
 
 __all__ = [
-    'NAMES',
-    'Agent',
-    'DQN',
-    'ReplayMemory',
+    "NAMES",
+    "Agent",
+    "DQN",
+    "ReplayMemory",
 ]

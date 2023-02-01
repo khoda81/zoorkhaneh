@@ -3,6 +3,7 @@ from typing import Optional, Union
 import math
 import pickle
 import time
+from collections.abc import Mapping
 from itertools import count
 from pathlib import Path
 
@@ -11,14 +12,16 @@ from tqdm import tqdm, trange
 
 from general_q.agents import Agent
 
+__all__ = ["WallTimeObserver", "evaluate", "load_pretrained", "save_pretrained"]
+
 
 def evaluate(
-        env: Env,
-        agent: Agent,
-        steps: int,
-        train: bool = True,
-        step_callback: callable = None,
-        episode_callback: callable = None
+    env: Env,
+    agent: Agent,
+    steps: int,
+    train: bool = True,
+    step_callback: callable = None,
+    episode_callback: callable = None,
 ) -> None:
     """
     Run a single episode of the environment.
@@ -63,7 +66,13 @@ def evaluate(
                 for episode_step in episode_pbar:
                     action = agent(observation)
                     log_info = {}
-                    observation, reward, terminated, truncated, log_info["env"] = env.step(action)
+                    (
+                        observation,
+                        reward,
+                        terminated,
+                        truncated,
+                        log_info["env"],
+                    ) = env.step(action)
 
                     episode_reward += reward
 
@@ -124,7 +133,9 @@ def save_pretrained(
     """
 
     if not isinstance(path, (str, Path)):
-        raise TypeError(f"Invalid type for 'path': expected str or Path, got {type(path).__name__}")
+        raise TypeError(
+            f"Invalid type for 'path': expected str or Path, got {type(path).__name__}"
+        )
 
     path = Path(path) / f"{agent.name}.{agent.__class__.__name__}"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,8 +149,8 @@ def save_pretrained(
 
 
 def load_pretrained(
-        path: Union[str, Path],
-        raise_error: bool = True,
+    path: Union[str, Path],
+    raise_error: bool = True,
 ) -> Optional[Agent]:
     """
     Try to load the agent from the given path.
@@ -152,14 +163,17 @@ def load_pretrained(
         The loaded agent if the agent could be loaded.
     """
     if not isinstance(path, (str, Path)):
-        raise TypeError(f"Invalid type for 'path': expected str or Path, got {type(path).__name__}")
+        raise TypeError(
+            f"Invalid type for 'path': expected str or Path, got {type(path).__name__}"
+        )
 
     try:
         with open(path, "rb") as f:
             return pickle.load(f)
     except (FileNotFoundError, EOFError, pickle.UnpicklingError) as e:
         if raise_error:
-            raise pickle.UnpicklingError(f"Error loading agent from {path}") from e
+            raise pickle.UnpicklingError(
+                f"Error loading agent from {path}") from e
 
 
 class WallTimeObserver(ObservationWrapper):
@@ -171,10 +185,10 @@ class WallTimeObserver(ObservationWrapper):
         super().__init__(env)
         self.base = base
         self.n = math.ceil(math.log(time.time(), base)) + 1
-        self.observation_space = spaces.Dict({
-            "observation": env.observation_space,
-            "time": spaces.Box(low=0, high=1, shape=(self.n,), dtype=float),
-        })
+        self.observation_space = spaces.Dict(
+            observation=env.observation_space,
+            time=spaces.Box(low=0, high=1, shape=(self.n,), dtype=float),
+        )
 
     def observation(self, observation) -> dict:
         remainder = time.time()
@@ -187,3 +201,12 @@ class WallTimeObserver(ObservationWrapper):
             "observation": observation,
             "time": time_obs,
         }
+
+
+def flatten_dict(d: Mapping, parent_key: tuple = ()):
+    for k, v in d.items():
+        new_key = parent_key + (k,)
+        if isinstance(v, Mapping):
+            yield from flatten_dict(v, new_key)
+        else:
+            yield new_key, v

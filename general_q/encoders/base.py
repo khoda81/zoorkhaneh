@@ -20,14 +20,14 @@ class UnsupportedSpaceError(Exception):
 class Encoder(nn.Module, ABC, Generic[I, B]):
     def __init__(self, space: Space[I], *args, **kwargs):
         if not self.supports(space):
-            raise UnsupportedSpaceError(f"{self.__class__} does not support {space}")
+            raise UnsupportedSpaceError(
+                f"{self.__class__} does not support {space}"
+            )
 
         super().__init__(*args, **kwargs)
         self.space = space
         # phantom data to track device
         self.register_buffer("_phantom", torch.empty((0,)))
-
-    __call__: Callable[["Encoder", B], torch.FloatTensor]
 
     @property
     def device(self) -> torch.device:
@@ -37,9 +37,9 @@ class Encoder(nn.Module, ABC, Generic[I, B]):
     def supports(cls, space):
         try:
             return (
-                not hasattr(cls, "__annotations__") or
-                "space" not in cls.__annotations__ or
-                isinstance(space, cls.__annotations__["space"])
+                not hasattr(cls, "__annotations__")
+                or "space" not in cls.__annotations__
+                or isinstance(space, cls.__annotations__["space"])
             )
         except TypeError:
             raise TypeError(
@@ -76,3 +76,5 @@ class Encoder(nn.Module, ABC, Generic[I, B]):
             A batch of sequence of tokens: (*batch_shape, T, embed_dim), where T
             is the number of tokens.
         """
+
+    __call__: Callable[["Encoder", B], torch.FloatTensor]

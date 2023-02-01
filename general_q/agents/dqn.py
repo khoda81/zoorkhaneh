@@ -18,22 +18,22 @@ from general_q.encoders.storage import MapStorage
 
 class DQN(Agent):
     def __init__(
-            self,
-            action_space: Space[ActType],
-            observation_space: Space[ObsType],
-            name: Optional[str] = None,
-            action_encoder=DiscreteEncoder,
-            observation_encoder=auto_encoder,
-            q_model: Optional[nn.Module] = None,
-            embed_dim: int = 256,
-            device: torch.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            ),
-            lr: float = 1e-4,
-            epsilon: float = 5e-1,
-            epsilon_decay: float = -7.0,
-            gamma: float = 4.0,
-            memory_capacity: int = 2**16,
+        self,
+        action_space: Space[ActType],
+        observation_space: Space[ObsType],
+        name: Optional[str] = None,
+        action_encoder=DiscreteEncoder,
+        observation_encoder=auto_encoder,
+        q_model: Optional[nn.Module] = None,
+        embed_dim: int = 256,
+        device: torch.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        ),
+        lr: float = 1e-4,
+        epsilon: float = 5e-1,
+        epsilon_decay: float = -7.0,
+        gamma: float = 4.0,
+        memory_capacity: int = 2**16,
     ) -> None:
         """
         Args:
@@ -74,12 +74,16 @@ class DQN(Agent):
         self.q_model = q_model
 
         self.action_encoder = action_encoder(action_space, embed_dim)
-        assert isinstance(self.action_encoder, Encoder), \
-            f"{self.action_encoder} should inherit from {Encoder}"
+        assert isinstance(
+            self.action_encoder, Encoder
+        ), f"{self.action_encoder} should inherit from {Encoder}"
 
-        self.observation_encoder = observation_encoder(observation_space, embed_dim)
-        assert isinstance(self.observation_encoder, Encoder), \
-            f"{self.observation_encoder} should inherit from {Encoder}"
+        self.observation_encoder = observation_encoder(
+            observation_space, embed_dim
+        )
+        assert isinstance(
+            self.observation_encoder, Encoder
+        ), f"{self.observation_encoder} should inherit from {Encoder}"
 
         self.optimizer = optim.Adam(
             params=chain(
@@ -94,7 +98,7 @@ class DQN(Agent):
             action_space=self.action_space,
             observation_space=self.observation_space,
             capacity=memory_capacity,
-            device=device
+            device=device,
         )
 
         self.to(device)
@@ -118,8 +122,12 @@ class DQN(Agent):
     def remember_initial(self, observation: ObsType) -> None:
         self.gameplays.append_initial(observation)
 
-    def remember_transition(self, action, reward, terminated, truncated, new_observation) -> None:
-        self.gameplays.append_transition(action, reward, terminated, truncated, new_observation)
+    def remember_transition(
+        self, action, reward, terminated, truncated, new_observation
+    ) -> None:
+        self.gameplays.append_transition(
+            action, reward, terminated, truncated, new_observation
+        )
 
     def learn(self, batch_size=128) -> dict[str, torch.Tensor]:
         """
@@ -149,9 +157,12 @@ class DQN(Agent):
         """
         Sample a batch of transitions from the replay memory.
         """
-        terminal = self.gameplays.storage.map["terminated"].data | self.gameplays.storage.map["truncated"].data
+        terminal = (
+            self.gameplays.storage.map["terminated"].data
+            | self.gameplays.storage.map["truncated"].data
+        )
         terminal[self.gameplays.last] = True
-        last_indices, = torch.where(~terminal)
+        (last_indices,) = torch.where(~terminal)
 
         last_indices = last_indices[torch.randperm(len(last_indices))]  # randomize indices
         last_indices = last_indices[:batch_size]

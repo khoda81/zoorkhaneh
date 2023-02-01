@@ -14,6 +14,15 @@ from general_q.encoders.storage import TensorStorage
 M = TypeVar("M", bound=torch.nn.Module)
 
 
+__all__ = [
+    "DiscreteEncoder",
+    "FloatTensorEncoder",
+    "IntTensorEncoder",
+    "TensorEncoder",
+    "unflatten",
+]
+
+
 def unflatten(tensor: torch.Tensor, dim, sizes):
     if len(sizes) == 0:
         return tensor.squeeze(dim=dim)
@@ -22,7 +31,13 @@ def unflatten(tensor: torch.Tensor, dim, sizes):
 
 
 class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
-    def __init__(self, space: Space[I], embed_dim: Optional[int], *args, **kwargs):
+    def __init__(
+        self,
+        space: Space[I],
+        embed_dim: Optional[int],
+        *args,
+        **kwargs,
+    ):
         super().__init__(space)
         sample = torch.tensor(space.sample())
         self.dtype = sample.dtype
@@ -33,8 +48,10 @@ class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
             self.encoder = self.make_encoder(embed_dim, *args, **kwargs)
 
     def make_encoder(self, *args, **kwargs) -> nn.Module:
-        raise NotImplementedError("If you don't need to make a neural network, "
-                                  "pass embed_dim=None to the constructor")
+        raise NotImplementedError(
+            "If you don't need to make a neural network, "
+            "pass embed_dim=None to the constructor"
+        )
 
     def prepare(self, sample: I) -> TensorStorage:
         if isinstance(sample, torch.Tensor):
@@ -45,9 +62,10 @@ class TensorEncoder(Encoder[I, TensorStorage], Generic[I]):
         num_space_dims = len(self.space.shape)
         num_sample_shape = len(sample.shape)
         num_batch_dims = num_sample_shape - num_space_dims
-        assert sample.shape[num_batch_dims:] == self.space.shape, \
-            f"Sample shape={tuple(sample.shape)} does not match expected shape: " \
+        assert sample.shape[num_batch_dims:] == self.space.shape, (
+            f"Sample shape={tuple(sample.shape)} does not match expected shape: "
             f"(*batch_shape, {', '.join(map(str, self.space.shape))})"
+        )
 
         if num_space_dims > 0:
             sample = sample.flatten(start_dim=num_batch_dims)
@@ -122,7 +140,7 @@ class FloatTensorEncoder(TensorEncoder):
         repeats = batch_shape + (1,) * len(self.space.shape)
 
         space = spaces.Box(
-            low=np.tile(self.space.low,  repeats),
+            low=np.tile(self.space.low, repeats),
             high=np.tile(self.space.high, repeats),
             shape=batch_shape + self.space.shape,
             dtype=self.space.dtype,
@@ -183,7 +201,7 @@ class IntTensorEncoder(TensorEncoder):
         repeats = batch_shape + (1,) * len(self.space.shape)
 
         space = spaces.Box(
-            low=np.tile(self.space.low,  repeats),
+            low=np.tile(self.space.low, repeats),
             high=np.tile(self.space.high, repeats),
             shape=batch_shape + self.space.shape,
             dtype=self.space.dtype,

@@ -12,18 +12,17 @@ class DictEncoder(Encoder, nn.ModuleDict):
     space: spaces.Dict
 
     def __init__(
-            self,
-            space: spaces.Dict,
-            subencoder,
-            embed_dim: Optional[int],
-            *args, **kwargs,
+        self,
+        space: spaces.Dict,
+        subencoder,
+        embed_dim: Optional[int],
+        *args,
+        **kwargs,
     ):
         super().__init__(space, *args, **kwargs)
         for key, subspace in space.items():
             encoder = subencoder(
-                space=subspace,
-                embed_dim=embed_dim,
-                *args, **kwargs
+                space=subspace, embed_dim=embed_dim, *args, **kwargs
             )
 
             assert isinstance(encoder, Encoder), \
@@ -32,13 +31,20 @@ class DictEncoder(Encoder, nn.ModuleDict):
             self[key] = encoder
 
     def prepare(self, sample: dict):
-        return MapStorage((k, e.prepare(s)) for k, (e, s) in dzip(self, sample, keys=sample))
+        return MapStorage(
+            (k, e.prepare(s)) for k, (e, s) in dzip(self, sample, keys=sample)
+        )
 
     def unprepare(self, sample: MapStorage):
-        return {k: e.item(s) for k, (e, s) in dzip(self, sample.map, keys=sample.map)}
+        return {
+            k: e.item(s)
+            for k, (e, s) in dzip(self, sample.map, keys=sample.map)
+        }
 
     def sample(self, batch_shape=()) -> MapStorage:
-        return MapStorage((k, e.sample(batch_shape=batch_shape)) for k, e in self.items())
+        return MapStorage(
+            (k, e.sample(batch_shape=batch_shape)) for k, e in self.items()
+        )
 
     def forward(self, sample: MapStorage):
         encoded = [e(s) for _, (e, s) in dzip(self, sample.map, keys=self)]
@@ -49,18 +55,20 @@ class TupleEncoder(Encoder, nn.ModuleList):
     space: spaces.Tuple
 
     def __init__(
-            self,
-            space: spaces.Tuple,
-            subencoder,
-            embed_dim: Optional[int],
-            *args, **kwargs,
+        self,
+        space: spaces.Tuple,
+        subencoder,
+        embed_dim: Optional[int],
+        *args,
+        **kwargs,
     ):
         super().__init__(space, *args, **kwargs)
         for space in space.spaces:
             encoder = subencoder(
                 space=space,
                 embed_dim=embed_dim,
-                *args, **kwargs,
+                *args,
+                **kwargs,
             )
 
             assert isinstance(encoder, Encoder), \

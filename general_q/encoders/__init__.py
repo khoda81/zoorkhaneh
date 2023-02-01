@@ -17,20 +17,20 @@ from general_q.encoders.tensor_encoder import (
 )
 
 __all__ = [
-    'auto_encoder',
-    'DictEncoder',
-    'DiscreteEncoder',
-    'Encoder',
-    'FloatTensorEncoder',
-    'ImageEncoder',
-    'IntTensorEncoder',
-    'MapStorage',
-    'Storage',
-    'TensorEncoder',
-    'TensorStorage',
-    'TupleEncoder',
-    'TupleStorage',
-    'UnsupportedSpaceError',
+    "auto_encoder",
+    "DictEncoder",
+    "DiscreteEncoder",
+    "Encoder",
+    "FloatTensorEncoder",
+    "ImageEncoder",
+    "IntTensorEncoder",
+    "MapStorage",
+    "Storage",
+    "TensorEncoder",
+    "TensorStorage",
+    "TupleEncoder",
+    "TupleStorage",
+    "UnsupportedSpaceError",
 ]
 
 

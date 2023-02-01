@@ -21,11 +21,11 @@ class Storage:
         pass
 
     @abstractmethod
-    def __iter__(self):
+    def __setitem__(self, item, value):
         pass
 
     @abstractmethod
-    def __setitem__(self, item, value):
+    def __iter__(self):
         pass
 
     @abstractmethod
@@ -47,11 +47,11 @@ class TensorStorage(Storage):
     def __getitem__(self, item):
         return self.__class__(self.data[item])
 
-    def __iter__(self):
-        return map(self.__class__, self.data)
-
     def __setitem__(self, item, value: "TensorStorage"):
         self.data[item] = value.data
+
+    def __iter__(self):
+        return map(self.__class__, self.data)
 
     def __repr__(self):
         return self.data.__repr__()
@@ -60,10 +60,7 @@ class TensorStorage(Storage):
 def dzip(*mappings, keys=None, collect=tuple):
     if not mappings:
         if keys is not None:
-            yield from (
-                (key, collect(iter(())))
-                for key in keys
-            )
+            yield from ((key, collect(iter(()))) for key in keys)
 
         return
 
@@ -91,14 +88,8 @@ class MapStorage(Storage):
     def shape(self):
         return {k: v.shape for k, v in self.map.items()}
 
-    def __repr__(self):  # TODO write a proper repr
-        return self.map.__repr__()
-
     def __getitem__(self, item):
-        return self.__class__(
-            (k, v[item])
-            for k, v in self.map.items()
-        )
+        return self.__class__((k, v[item]) for k, v in self.map.items())
 
     def __setitem__(self, item, value: "MapStorage"):
         for _, (v1, v2) in dzip(self.map, value.map, keys=value.map):
@@ -116,6 +107,9 @@ class MapStorage(Storage):
             except StopIteration:
                 return
 
+    def __repr__(self):  # TODO write a proper repr
+        return self.map.__repr__()
+
 
 class TupleStorage(Storage):
     items: tuple[Storage]
@@ -131,9 +125,6 @@ class TupleStorage(Storage):
     def shape(self):
         return tuple(v.shape for v in self.items)
 
-    def __repr__(self):
-        return self.items.__repr__()
-
     def __getitem__(self, item):
         return self.__class__(v[item] for v in self.items)
 
@@ -147,3 +138,6 @@ class TupleStorage(Storage):
 
     def __iter__(self):
         return map(self.__class__, zip(*self.items))
+
+    def __repr__(self):
+        return self.items.__repr__()

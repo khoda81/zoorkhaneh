@@ -15,10 +15,10 @@ with open(NAMES_PATH) as f:
 class Agent(Generic[ActType, ObsType]):
     # TODO write interface for switching the same agent between different environments
     def __init__(
-            self,
-            action_space: Space[ActType],
-            observation_space: Space[ObsType],
-            name: Optional[str] = None,
+        self,
+        action_space: Space[ActType],
+        observation_space: Space[ObsType],
+        name: Optional[str] = None,
     ) -> None:
         """
         Initialize the class.
@@ -63,12 +63,12 @@ class Agent(Generic[ActType, ObsType]):
         """
 
     def remember_transition(
-            self,
-            action: ActType,
-            reward: float,
-            terminated: bool,
-            truncated: bool,
-            new_observation: ObsType,
+        self,
+        action: ActType,
+        reward: float,
+        terminated: bool,
+        truncated: bool,
+        new_observation: ObsType,
     ) -> None:
         """
         Remember this action and the consequences. Data stored by this method should only be used for learning.
@@ -91,18 +91,18 @@ class Agent(Generic[ActType, ObsType]):
         """
         return {}
 
+    def __call__(self, obs: ObsType) -> ActType:
+        """Call agent.act()"""
+        return self.act(obs)
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.reset()
 
-    def __call__(self, obs: ObsType) -> ActType:
-        """Call agent.act()"""
-        return self.act(obs)
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name!r})"
 
     def __str__(self) -> str:
         return self.name
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(name={self.name!r})'

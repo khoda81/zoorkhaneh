@@ -10,14 +10,14 @@ class InvalidMemoryState(Exception):
 
 class ReplayMemory:
     def __init__(
-            self,
-            observation_space: Space,
-            action_space: Space,
-            capacity: int,
-            auto_truncate: bool = True,
-            device: torch.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            ),
+        self,
+        observation_space: Space,
+        action_space: Space,
+        capacity: int,
+        auto_truncate: bool = True,
+        device: torch.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        ),
     ):
         # TODO stop allocating all memory at once, implement dynamic list
         self.observation_space = observation_space
@@ -31,7 +31,9 @@ class ReplayMemory:
             new_observation=observation_space,
         )
 
-        self.encoder = DictEncoder(space, subencoder=auto_encoder, embed_dim=None).to(device)
+        self.encoder = DictEncoder(
+            space, subencoder=auto_encoder, embed_dim=None
+        ).to(device)
         self.storage = self.encoder.sample([capacity])
         self.storage.map["truncated"].data[:] = True
 
@@ -41,7 +43,9 @@ class ReplayMemory:
         self.size          = 0
 
     def to(self, device: torch.device):
-        self.storage = self.storage.transformed(lambda tensor: tensor.to(device))
+        self.storage = self.storage.transformed(
+            lambda tensor: tensor.to(device)
+        )
         self.encoder.to(device)
 
     def append_initial(self, new_observation) -> None:
@@ -69,12 +73,12 @@ class ReplayMemory:
         self.storage[self.last] = state
 
     def append_transition(
-            self,
-            action,
-            reward,
-            terminated,
-            truncated,
-            new_observation,
+        self,
+        action,
+        reward,
+        terminated,
+        truncated,
+        new_observation,
     ) -> None:
         transition = self.encoder.prepare({
             "action"         : action,
@@ -88,8 +92,8 @@ class ReplayMemory:
         self.size = min(self.size + 1, self.capacity)
         self.storage[self.last] = transition
 
-    def __bool__(self):
-        return self.size > 0
-
     def __len__(self):
         return self.size
+
+    def __bool__(self):
+        return self.size > 0
