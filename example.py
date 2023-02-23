@@ -89,7 +89,7 @@ def train(wandb_project="general_q") -> None:
         print(f"\tEnv:   {env.unwrapped!s}")
 
     def step_callback(step, log_info, **kwargs):
-        log_info = {".".join(k): v for k, v in flatten_dict()(log_info)}
+        log_info = {".".join(k): v for k, v in flatten_dict(log_info)}
 
         wandb.log({
             "step": step,
@@ -101,6 +101,7 @@ def train(wandb_project="general_q") -> None:
 
     def episode_callback(**kwargs):
         wandb.log(kwargs)
+        pass
 
     wandb.init(
         project=wandb_project,
@@ -112,7 +113,7 @@ def train(wandb_project="general_q") -> None:
         evaluate(
             env,
             agent,
-            steps=10_000,
+            steps=100_000,
             train=True,
             step_callback=step_callback,
             episode_callback=episode_callback,
