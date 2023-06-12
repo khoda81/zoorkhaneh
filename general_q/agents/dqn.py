@@ -180,18 +180,18 @@ class DQN(Agent):
         """
         Calculate the loss value for this specified transitions
         """
-        observation          = sample.map["observation"]                  # [batch_size]
-        observation          = self.observation_encoder(observation)      # [batch_size, s, emb]
-        action               = sample.map["action"]                       # [batch_size]
-        action               = self.action_encoder(action)                # [batch_size, s, emb]
-        new_observation      = sample.map["new_observation"]              # [batch_size]
-        new_observation      = self.observation_encoder(new_observation)  # [batch_size, s, emb]
-        _, action_embeddings = self.action_encoder.all()                  # [n, s, emb]
+        new_observation = sample.map["new_observation"]              # [batch_size]
+        new_observation = self.observation_encoder(new_observation)  # [batch_size, s, emb]
+        observation     = sample.map["observation"]                  # [batch_size]
+        observation     = self.observation_encoder(observation)      # [batch_size, s, emb]
+        action          = sample.map["action"]                       # [batch_size]
+        action          = self.action_encoder(action)                # [batch_size, s, emb]
 
-        new_observation   = new_observation.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
-        action_embeddings = action_embeddings.sum(dim=-2)                      # [n, emb]
-        next_qs           = self.q_model(new_observation + action_embeddings)  # [batch_size, n]
-        best_q, _         = next_qs.max(dim=-1)                                # [batch_size]
+        _, action_embeddings = self.action_encoder.all()                          # [n, s, emb]
+        new_observation      = new_observation.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
+        action_embeddings    = action_embeddings.sum(dim=-2)                      # [n, emb]
+        next_qs              = self.q_model(new_observation + action_embeddings)  # [batch_size, n]
+        best_q, _            = next_qs.max(dim=-1)                                # [batch_size]
 
         # discount factor is zero where the episode has terminated and
         # sigmoid(self.gamma) everywhere else
