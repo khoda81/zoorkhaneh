@@ -8,9 +8,9 @@ The project is under a rename from "general-q" to "zoorkhaneh".
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)
-[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/khoda81/general-q/blob/master/.pre-commit-config.yaml)
-[![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/khoda81/general-q/releases)
-[![License](https://img.shields.io/github/license/khoda81/general-q)](https://github.com/khoda81/general-q/blob/master/LICENSE)
+[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/khoda81/zoorkhaneh/blob/master/.pre-commit-config.yaml)
+[![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/khoda81/zoorkhaneh/releases)
+[![License](https://img.shields.io/github/license/khoda81/zoorkhaneh)](https://github.com/khoda81/zoorkhaneh/blob/master/LICENSE)
 
 An easy to use library for general purpose reinforcement learning and experimentation
 
@@ -18,10 +18,10 @@ An easy to use library for general purpose reinforcement learning and experiment
 
 ## 🛡 License
 
-[![License](https://img.shields.io/github/license/khoda81/general-q)](https://github.com/khoda81/general-q/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/khoda81/zoorkhaneh)](https://github.com/khoda81/zoorkhaneh/blob/master/LICENSE)
 
 This project is licensed under the terms of the `MIT` license.
-See [LICENSE](https://github.com/khoda81/general-q/blob/master/LICENSE) for more details.
+See [LICENSE](https://github.com/khoda81/zoorkhaneh/blob/master/LICENSE) for more details.
 
 ## 📃 Citation
 
@@ -32,7 +32,7 @@ See [LICENSE](https://github.com/khoda81/general-q/blob/master/LICENSE) for more
   year = {2022},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/khoda81/general-q}}
+  howpublished = {\url{https://github.com/khoda81/zoorkhaneh}}
 }
 ```
 

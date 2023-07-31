@@ -13,8 +13,8 @@ description = "An easy to use library for general purpose reinforcement learning
 readme = "README.md"
 authors = ["axiom <20.mahdikh.0@gmail.com>"]
 license = "MIT"
-repository = "https://github.com/khoda81/general-q"
-homepage = "https://github.com/khoda81/general-q"
+repository = "https://github.com/khoda81/zoorkhaneh"
+homepage = "https://github.com/khoda81/zoorkhaneh"
 
 keywords = ["Reinforcement Learning", "RL", "AI", "general_q"]
 
