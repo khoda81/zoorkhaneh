@@ -6,6 +6,7 @@ The project is under a rename from "general-q" to "zoorkhaneh".
 
 [![Python Version](https://img.shields.io/pypi/pyversions/general-q.svg)](https://pypi.org/project/general-q/)
 
+[![Build status](https://github.com/khoda81/zoorkhaneh/actions/workflows/build.yml/badge.svg?branch=main&event=push)](https://github.com/khoda81/zoorkhaneh/actions/workflows/build.yml/badge.svg?branch=main&event=push)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-green.svg)](https://github.com/PyCQA/bandit)
 [![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/khoda81/zoorkhaneh/blob/master/.pre-commit-config.yaml)
