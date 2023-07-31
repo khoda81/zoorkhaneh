@@ -1,8 +1,9 @@
 # general-q
 
+The project is under a rename from "general-q" to "zoorkhaneh".
+
 <div align="center">
 
-[![Build status](https://github.com/khoda81/general-q/workflows/build/badge.svg?branch=master&event=push)](https://github.com/khoda81/general-q/workflows/build/badge.svg?branch=master&event=push)
 [![Python Version](https://img.shields.io/pypi/pyversions/general-q.svg)](https://pypi.org/project/general-q/)
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -10,23 +11,10 @@
 [![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/khoda81/general-q/blob/master/.pre-commit-config.yaml)
 [![Semantic Versions](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--versions-e10079.svg)](https://github.com/khoda81/general-q/releases)
 [![License](https://img.shields.io/github/license/khoda81/general-q)](https://github.com/khoda81/general-q/blob/master/LICENSE)
-![Coverage Report](assets/images/coverage.svg)
 
 An easy to use library for general purpose reinforcement learning and experimentation
 
 </div>
-
-## Installation
-
-```bash
-pip install -U general-q
-```
-
-or install with `Poetry`
-
-```bash
-poetry add general-q
-```
 
 ## 🛡 License
 
