@@ -62,11 +62,10 @@ def load_agent(path, env: gymnasium.Env) -> Optional[Agent]:
         if agent is None:
             continue
 
-        if (
-            agent.action_space != env.action_space
-        ) or (
-            agent.observation_space != env.observation_space
-        ):
+        agent_info = (agent.action_space, agent.observation_space)
+        env_info = (env.action_space, env.observation_space)
+
+        if agent_info != env_info:
             continue
 
         modify_time = path.stat().st_mtime
@@ -91,10 +90,12 @@ def train(wandb_project="general_q") -> None:
     def step_callback(step, log_info, **kwargs):
         log_info = {".".join(k): v for k, v in flatten_dict(log_info)}
 
-        wandb.log({
-            "step": step,
-            **log_info,
-        })
+        wandb.log(
+            {
+                "step": step,
+                **log_info,
+            }
+        )
 
         if (step + 1) % 2000 == 0:
             save_pretrained(agent, SAVE_PATH)
