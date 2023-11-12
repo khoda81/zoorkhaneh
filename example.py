@@ -29,6 +29,7 @@ def create_agent(env: gymnasium.Env) -> Agent:
 
 
 def create_env():
+    # fmt: off
     env = gymnasium.make(
         # id="Acrobot-v1",
         # id="BipedalWalker-v3",
@@ -44,6 +45,7 @@ def create_env():
 
         # continuous=False,
     )
+    # fmt: on
 
     env = WallTimeObserver(env)
 
@@ -90,12 +92,7 @@ def train(wandb_project="general_q") -> None:
     def step_callback(step, log_info, **kwargs):
         log_info = {".".join(k): v for k, v in flatten_dict(log_info)}
 
-        wandb.log(
-            {
-                "step": step,
-                **log_info,
-            }
-        )
+        wandb.log({"step": step, **log_info})
 
         if (step + 1) % 2000 == 0:
             save_pretrained(agent, SAVE_PATH)

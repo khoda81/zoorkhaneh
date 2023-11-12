@@ -2,7 +2,4 @@
   "editor.tabCompletion": "on",
   "diffEditor.codeLens": true,
   "python.analysis.typeCheckingMode": "off",
-  "[python]": {
-    "editor.formatOnSave": false,
-  }
 }
