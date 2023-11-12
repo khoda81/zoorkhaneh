@@ -108,6 +108,7 @@ def train(wandb_project="general_q") -> None:
         project=wandb_project,
         dir=SAVE_PATH.parent,
         name=str(agent),
+        mode="disabled",
     )
 
     with env, agent:
