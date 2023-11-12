@@ -167,7 +167,6 @@ class DQN(Agent):
         last_indices = last_indices[torch.randperm(len(last_indices))]  # randomize indices
         last_indices = last_indices[:batch_size]
 
-        last_indices = torch.arange(self.gameplays.size)[last_indices]  # convert slices to indices
         indices = (last_indices + 1) % self.gameplays.capacity
 
         sample = self.gameplays.storage[indices]
