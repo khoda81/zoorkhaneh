@@ -22,9 +22,48 @@ SAVE_PATH = Path("tmp/pretrained")
 
 
 def create_agent(env: gymnasium.Env) -> Agent:
+    from torch import nn
+
+    embed_dim = 256
+
     return DQN(
         action_space=env.action_space,
         observation_space=env.observation_space,
+        embed_dim=256,
+        q_model=nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, 1),
+            nn.Flatten(-2),
+        ),
     )
 
 
@@ -35,9 +74,9 @@ def create_env():
         # id="BipedalWalker-v3",
         # id="Blackjack-v1",
         # id="CarRacing-v2",
-        id="CartPole-v1",
+        # id="CartPole-v1",
         # id="CliffWalking-v0",
-        # id="LunarLander-v2",
+        id="LunarLander-v2",
         # id="MountainCarContinuous-v0",
         # id="Pendulum-v1",
 
@@ -89,8 +128,17 @@ def train(wandb_project="general_q") -> None:
     except AttributeError:
         print(f"\tEnv:   {env.unwrapped!s}")
 
+    total_steps = 100_000
+    initial_learning_rate = 1e-4
+
     def step_callback(step, log_info, **kwargs):
         log_info = {".".join(k): v for k, v in flatten_dict(log_info)}
+
+        training_fraction = step / total_steps
+        current_learning_rate = (1 - training_fraction) * initial_learning_rate
+        if isinstance(agent, DQN):
+            log_info["lr"] = current_learning_rate
+            agent.set_lr(current_learning_rate)
 
         wandb.log({"step": step, **log_info})
 
@@ -105,14 +153,14 @@ def train(wandb_project="general_q") -> None:
         project=wandb_project,
         dir=SAVE_PATH.parent,
         name=str(agent),
-        mode="disabled",
+        mode="offline",
     )
 
     with env, agent:
         evaluate(
             env,
             agent,
-            steps=100_000,
+            steps=total_steps,
             train=True,
             step_callback=step_callback,
             episode_callback=episode_callback,

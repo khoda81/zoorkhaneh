@@ -143,7 +143,7 @@ class DQN(Agent):
 
         batch_size = min(batch_size, len(self.gameplays))
         if batch_size == 0:
-            return 0.0
+            return {"loss": 0.0}
 
         sample = self.sample_transitions(batch_size)
         loss = self.calculate_loss(sample)
@@ -164,14 +164,17 @@ class DQN(Agent):
         terminal[self.gameplays.last] = True
         (last_indices,) = torch.where(~terminal)
 
-        last_indices = last_indices[torch.randperm(len(last_indices))]  # randomize indices
+        last_indices = last_indices[
+            torch.randperm(len(last_indices))
+        ]  # randomize indices
         last_indices = last_indices[:batch_size]
 
         indices = (last_indices + 1) % self.gameplays.capacity
 
         sample = self.gameplays.storage[indices]
-        sample.map["observation"] = \
-            self.gameplays.storage.map["new_observation"][last_indices]
+        sample.map["observation"] = self.gameplays.storage.map[
+            "new_observation"
+        ][last_indices]
 
         return sample
 
@@ -179,30 +182,40 @@ class DQN(Agent):
         """
         Calculate the loss value for this specified transitions
         """
-        new_observation = sample.map["new_observation"]              # [batch_size]
-        new_observation = self.observation_encoder(new_observation)  # [batch_size, s, emb]
-        observation     = sample.map["observation"]                  # [batch_size]
-        observation     = self.observation_encoder(observation)      # [batch_size, s, emb]
-        action          = sample.map["action"]                       # [batch_size]
-        action          = self.action_encoder(action)                # [batch_size, s, emb]
+        new_observation = sample.map["new_observation"]  # [batch_size]
+        new_observation = self.observation_encoder(
+            new_observation
+        )  # [batch_size, s, emb]
+        observation = sample.map["observation"]  # [batch_size]
+        observation = self.observation_encoder(
+            observation
+        )  # [batch_size, s, emb]
+        action = sample.map["action"]  # [batch_size]
+        action = self.action_encoder(action)  # [batch_size, s, emb]
 
-        _, action_embeddings = self.action_encoder.all()                          # [n, s, emb]
-        new_observation      = new_observation.sum(dim=-2, keepdim=True)          # [batch_size, 1, emb]
-        action_embeddings    = action_embeddings.sum(dim=-2)                      # [n, emb]
-        next_qs              = self.q_model(new_observation + action_embeddings)  # [batch_size, n]
-        best_q, _            = next_qs.max(dim=-1)                                # [batch_size]
+        _, action_embeddings = self.action_encoder.all()  # [n, s, emb]
+        new_observation = new_observation.sum(
+            dim=-2, keepdim=True
+        )  # [batch_size, 1, emb]
+        action_embeddings = action_embeddings.sum(dim=-2)  # [n, emb]
+        next_qs = self.q_model(
+            new_observation + action_embeddings
+        )  # [batch_size, n]
+        best_q, _ = next_qs.max(dim=-1)  # [batch_size]
 
         # discount factor is zero where the episode has terminated and
         # sigmoid(self.gamma) everywhere else
-        terminated      = sample.map["terminated"] .data             # [batch_size]
-        rewards         = sample.map["reward"].data                  # [batch_size]
-        discount_factor = ~terminated / (1 + math.exp(-self.gamma))  # [batch_size]
-        q_target        = rewards + best_q * discount_factor         # [batch_size]
+        terminated = sample.map["terminated"].data  # [batch_size]
+        rewards = sample.map["reward"].data  # [batch_size]
+        discount_factor = ~terminated / (
+            1 + math.exp(-self.gamma)
+        )  # [batch_size]
+        q_target = rewards + best_q * discount_factor  # [batch_size]
 
-        observation = observation.sum(dim=-2)             # [batch_size, emb]
-        action      = action.sum(dim=-2)                  # [batch_size, emb]
-        q           = self.q_model(observation + action)  # [batch_size]
-        loss        = F.mse_loss(q, q_target.detach())
+        observation = observation.sum(dim=-2)  # [batch_size, emb]
+        action = action.sum(dim=-2)  # [batch_size, emb]
+        q = self.q_model(observation + action)  # [batch_size]
+        loss = F.mse_loss(q, q_target.detach())
 
         return loss
 
